@@ -1,0 +1,81 @@
+(in-package "CL-USER")
+(defvar *gficl-source-dir* "/7/gtk/EXT-LISP/gficl/")
+(defvar *gficl-binary-dir* (binary-directory *gficl-source-dir*))
+
+(mk:defsystem :gficl-examples
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on (:gficl
+	       :gficl/load)
+  :components ((:module "examples"
+		:components ((:file "package")
+			     (:file "minimum")
+			     (:file "quad-spin")
+			     (:file "cube-wave")
+			     (:file "post-processing")
+			     (:file "model-loading")
+			     (:file "font-rendering")
+			     (:file "shadows")
+			     (:file "pbr")))))
+
+#+nil
+(mk:oos :gficl-examples :load :compile-during-load t)
+
+(mk:defsystem :gficl/load
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on (:gficl
+	       :cl-wavefront
+	       :cl-gltf
+	       :pngload
+	       :cl-jpeg
+	       :truetype-clx)
+  :components ((:module "src/load"
+		:components ((:file "package")
+			     (:file "model")
+			     (:file "shader")
+			     (:file "image")
+			     (:file "font")))))
+
+#+nil
+(mk:oos :gficl/load :load :compile-during-load t)
+
+(mk:defsystem :gficl
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on (:uiop
+	       :cl-glfw3
+	       :cl-opengl
+	       :cffi)
+  :components ((:module "src"
+		:components ((:file "package")
+			     (:file "gficl"
+			      :depends-on ("input"))
+			     (:file "input"
+			      :depends-on ("state"))
+			     (:file "state")
+			     (:file "types")
+			     (:file "vector")
+			     (:file "quaternion"
+			      :depends-on ("vector"))
+			     (:file "matrix"
+			      :depends-on ("quaternion"
+					   "shader"))
+			     (:file "shader"
+			      :depends-on ("types"))
+			     (:file "framebuffer"
+			      :depends-on ("types"
+					   "image"))
+			     (:file "image"
+			      :depends-on ("types"))
+			     (:file "vertex"
+			      :depends-on ("types"))
+			     (:file "buffer"
+			      :depends-on ("types"))))))
+
+#+nil
+(mk:oos :gficl :load :compile-during-load t)
+
