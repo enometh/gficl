@@ -245,7 +245,7 @@ returns as values the view matrix, the left vector, and the up vector."
 	`(0 0 1 ,(- (* 2 near))))
      (0 0 1 0))))
 
-(declaim (ftype (function (number number number number &optional number) matrix)
+(declaim (ftype (function (number number number number &optional (or null number)) matrix)
 		screen-perspective-matrix))
 (defun screen-perspective-matrix (width height fov near &optional far)
   "create a 4x4 perspective projection MATRIX, far plane at infinity if not given.
