@@ -1,4 +1,4 @@
-#+linux (deploy:define-library cl-opengl-bindings::opengl :dont-deploy t)
+;;#+linux (deploy:define-library cl-opengl-bindings::opengl :dont-deploy t)
 
 (defmacro defexample (name &body body)
   `(defpackage ,(make-symbol
