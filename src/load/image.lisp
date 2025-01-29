@@ -33,6 +33,8 @@
   "Load an image file into a texture from given path. 
 TEXTURE-KEY-ARGS holds any keyword args to GFICL:MAKE-TEXTURE except :format and :data.
 Returns as values a GFICL:TEXTURE, texture width, and texture height"
+  (unless (eql :absolute (pathname-directory path))
+    (setq path (resolve-path path)))
   (str-case (pathname-type path)
 	    ("png" (image-png path texture-key-args))
 	    (("jpeg" "jpg") (image-jpeg path texture-key-args))

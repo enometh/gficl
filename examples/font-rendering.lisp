@@ -33,7 +33,7 @@ void main() {
   colour = vec4(text_colour, text_alpha);
 }")
 
-(defparameter *font-path* #p"examples/assets/Roboto-Regular.ttf")
+(defparameter *font-path*(GFICL/LOAD::RESOLVE-PATH #p"examples/assets/Roboto-Regular.ttf"))
 
 (defun setup ()
   (gl:clear-color 0.5 0.7 0.8 0)
