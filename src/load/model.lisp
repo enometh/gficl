@@ -1,5 +1,16 @@
 (in-package :gficl/load)
 
+#+mk-defsystem
+(defvar *default-system* :gficl
+  "Name of system against which resolve-path resolves relative paths")
+
+(defun resolve-path (path)
+  #+(and asdf (not mk-defsystem))
+  path
+  #+mk-defsystem
+  (mk::system-relative-pathname *default-system* path))
+
+
 (deftype vertex-element () '(memeber :position :normal :uv :skip))
 
 (declaim (ftype (function ((or pathname string) &key (:vertex-form list)) list)
@@ -9,7 +20,7 @@
   "takes a path to a model and returns a list of meshes (each mesh a VERTEX-DATA instance).
 :vertex-form is a list of VERTEX-ELEMENT (ie :position, :normal, :uv, or :skip)"
   (let ((meshes) (textures))
-    (loop for mesh in (obj:extract-meshes (obj:parse (probe-file model-path))) do	  
+    (loop for mesh in (obj:extract-meshes (obj:parse (truename (resolve-path model-path)))) do	  
 	  (progn
 	    (setf meshes (cons (gficl:make-vertex-data-from-vectors
 				(get-vertex-form mesh vertex-form)
@@ -32,7 +43,7 @@
   (if val (cons key (obj:file val)) nil))
 
 (defun test ()
-  (gltf:with-gltf (torus (probe-file #p"examples/assets/torus.glb"))
+  (gltf:with-gltf (torus (truename (resolve-path #p"examples/assets/torus.glb")))
 		  (describe (gltf:buffers torus))
 		  (describe (gltf:buffer-views torus))
 		  (loop for mesh across (gltf:meshes torus) do

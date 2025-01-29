@@ -8,4 +8,6 @@
    :image
    :text
    :shader
-   :compute-shader))
+   :compute-shader
+   #+mk-defsystem *default-system*
+   :resolve-path))
