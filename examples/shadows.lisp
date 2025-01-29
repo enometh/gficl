@@ -378,8 +378,8 @@ void main() {
   (gficl:bind-gl *main-shader*)
   (gl:uniformi (gficl:shader-loc *main-shader* "shadow") 0)
   (gl:uniformi (gficl:shader-loc *main-shader* "vsm_shadow_map") 1)
-  (toggle-light-projection-mode)
   (update-light-pos)
+  (toggle-light-projection-mode)
   (update-camera 0))
 
 (defun resize (w h)
