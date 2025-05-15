@@ -483,6 +483,7 @@ void main() {
 
 (defun update-light-vp ()
   (gficl:bind-gl *main-shader*)
+  (unless *light-proj* (setq *light-proj* (gficl:orthographic-matrix 8 -4 -4 4 0 -50)))
   (gficl:bind-matrix *main-shader* "light_view_proj" (gficl:*mat *light-proj* *light-view*)))
 
 (defun next-shadow-mode ()
