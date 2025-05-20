@@ -11,6 +11,7 @@
   :components ((:module "examples"
 		:components ((:file "package")
 			     (:file "minimum")
+			     (:file "minimum-app")
 			     (:file "quad-spin")
 			     (:file "cube-wave")
 			     (:file "post-processing")
@@ -63,6 +64,8 @@
 	       :cffi)
   :components ((:module "src"
 		:components ((:file "package")
+			     (:file "base-app"
+			      :depends-on ("gficl" "types"))
 			     (:file "gficl"
 			      :depends-on ("input"))
 			     (:file "input"
