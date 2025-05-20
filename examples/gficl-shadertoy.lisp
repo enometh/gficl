@@ -7,13 +7,16 @@
 ;;;   Copyright (C) 2025 Madhu.  All Rights Reserved.
 ;;;
 ;;; - madhu 250514 - shaders from stacksmith/cepl-shadertoy
+;;; - madhu 250520 - rewritten to use gficl-app:base-app lifecycle
+;;;
 (defpackage #:gficl-examples/shadertoy
   (:use :cl)
   (:export #:run))
-
 (in-package :gficl-examples/shadertoy)
 
-(defparameter *vert* "// vertex-stage
+(defclass shadertoy-app (gficl-app:base-app)
+  ((vert :initarg :vert
+	 :initform "// vertex-stage
 #version 460
 
 layout(location = 0)  in vec3 fk_vert_position;
@@ -34,8 +37,8 @@ void main()
 }
 
 ")
-
-(defparameter *frag*  "// fragment-stage
+   (frag :initarg :frag
+	 :initform "// fragment-stage
 #version 460
 
 in _FROM_VERTEX_STAGE_
@@ -56,96 +59,106 @@ void main()
 }
 
 ")
+   ;; *quad* is a list compatible with g-pt format (vec-3 pos and a vec-2 tex)
+   (quad
+    :initform
+    (list (list (list -1    1  0) (list 0.0 0.0)) ;top-left
+	  (list (list -1   -1  0) (list 0.0 1.0)) ;bottom-left
+	  (list (list  1   -1  0) (list 1.0 1.0)) ;bottom-right
+	  (list (list -1    1  0) (list 0.0 0.0))
+	  (list (list  1   -1  0) (list 1.0 1.0))
+	  (list (list  1    1  0) (list 1.0 0.0)) ;top-right
+	  ))
+   (vertex-data-form
+    :initform
+    (gficl:make-vertex-form (list (gficl:make-vertex-slot 3 :int)
+				  (gficl:make-vertex-slot 2 :float))))
+   (idate :initform #(0 0 0 0))
+   (iglobaltime :initform 0.0)
+   (iresolution :initform #(0.0 0.0 0.0))
+   (data :initform nil)
+   (shader :initform nil)))
 
-;; *quad* is a list compatible with g-pt format (vec-3 pos and a vec-2 tex)
-(defvar $quad
-  (list (list (list -1    1  0) (list 0.0 0.0))
-	(list (list -1   -1  0) (list 0.0 1.0))
-	(list (list  1   -1  0) (list 1.0 1.0))
-	(list (list -1    1  0) (list 0.0 0.0))
-	(list (list  1   -1  0) (list 1.0 1.0))
-	(list (list  1    1  0) (list 1.0 0.0))))
-
-(defvar $vertex-data-form
-  (gficl:make-vertex-form (list (gficl:make-vertex-slot 3 :int)
-				(gficl:make-vertex-slot 2 :float))))
-
-(defparameter *iDate* #(0 0 0 0))
-
-(defun set-iDate ()
+(defmethod set-idate ((app shadertoy-app))
   "set *iDate* to a v4 containing year month day second"
-  (multiple-value-bind
-	(second minute hour date month year day-of-week dst-p tz)
-      (decode-universal-time (get-universal-time))
-    (declare (ignore minute hour day-of-week dst-p second tz))
-    (replace *iDate* (list year month date (glfw:get-time)))))
+  (with-slots (idate) app
+    (multiple-value-bind
+	  (second minute hour date month year day-of-week dst-p tz)
+	(decode-universal-time (get-universal-time))
+      (declare (ignore minute hour day-of-week dst-p second tz))
+      (replace idate (list year month date (glfw:get-time))))))
 
-(defparameter *iGlobalTime* 0.0)
-(defparameter *iResolution* #(0.0 0.0 0.0))
+(defmethod replace-shader ((app shadertoy-app) vert frag)
+  (with-slots ((main-shader shader)) app
+    (let (shader)
+      (with-simple-restart (cont "Cont")
+	(setq shader (gficl:make-shader vert frag)))
+      (when shader
+	(when main-shader
+	  (gficl:delete-gl main-shader))
+	(setq main-shader shader)))))
 
-(defvar *shader* nil)
+(defmethod gficl-app:resize-fn ((app shadertoy-app) w h)
+  (with-slots (iresolution shader) app
+    (replace iresolution (list w h 0.0))
+    (gficl:bind-gl shader)
+    (gl:viewport 0 0 w h)))
 
-(defun replace-shader (vert frag)
-  (let (shader)
-    (with-simple-restart (cont "Cont")
-      (setq shader (gficl:make-shader vert frag)))
-    (when shader
-      (when *shader*
-	(gficl:delete-gl *shader*))
-      (setq *shader* shader))))
+(defmethod gficl-app:cleanup-fn ((app shadertoy-app))
+  (with-slots (data shader) app
+    (when shader (gficl:delete-gl shader) (setq shader nil))
+    (when data (gficl:delete-gl data) (setq data nil))))
 
-(defun resize (w h)
-  (replace *iresolution* (list w h 0.0))
-  (gficl:bind-gl *shader*)
-  (gl:viewport 0 0 w h))
+(defmethod gficl-app:setup-fn ((app shadertoy-app))
+  (gficl-app:cleanup-fn app)
+  (with-slots (data shader vertex-data-form quad vert frag) app
+    (assert (and (not data) (not shader)))
+    (setq data (gficl:make-vertex-data vertex-data-form quad))
+    (replace-shader app vert frag))
+  ;; call gficl:bind-gl through the resize function
+  (gficl-app:resize-fn app (gficl:window-width) (gficl:window-height)))
 
 (defvar *recompile* nil
   "Set to T during the main loop to interrupt the main loop and recompile
-the shader from current *vert* and *frag* strings. The code which processes
+the shader from current vert and frag strings. The code which processes
 the interrupt should reset this to NIL.")
 
-(defun run ()
-  (gficl:with-window (:title "gficl shadertoy" :width 700 :height 394  :resize-callback #'resize)
+(defmethod replace-frag ((app shadertoy-app) fs-source)
+  (with-slots (frag) app
+    (setq frag fs-source)
+    (setq *recompile* t)))
+
+(defmethod gficl-app:update-fn ((app shadertoy-app))
+  (when *recompile*
     (setq *recompile* nil)
-    (prog ((*data* nil))
-       (declare (special *data*))
-     setup
-       (unless *shader* (replace-shader *vert* *frag*))
-       (unless *data*
-	 (setq *data* (gficl:make-vertex-data $vertex-data-form $quad)))
-       (resize (gficl:window-width) (gficl:window-height))
-       (unwind-protect
-	    (loop until (or (gficl:closedp) *recompile*)
-		  do (gficl:with-update (dt) ;; update
-		       dt
-		       (set-idate)
-		       (setq *iglobaltime* (glfw:get-time))
-		       (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
-		  do (gficl:with-render ;;draw
-		       (gl:clear :color-buffer)
-		       (gl:uniformfv (gficl:shader-loc *shader* "IDATE")
-				     (map 'vector 'float *idate*))
-		       (gl:uniformf (gficl:shader-loc *shader* "IGLOBALTIME")
-				    *iglobaltime*)
-		       (gl:uniformfv (gficl:shader-loc *shader* "IRESOLUTION")
-				     *iresolution*)
-		       (gficl:draw-vertex-data *data*)))
-	 (when *recompile*
-	   (format t "RECOMPILE SHADER~&")
-	   (replace-shader *vert* *frag*)
-	   (setq *recompile* nil)
-	   (go setup))
-	 (format t "CLEANUP~&")
-	 (when *shader* (gficl:delete-gl *shader*) (setq *shader* nil))
-	 (when *data* (gficl:delete-gl *data*) (setq *data* nil))))))
+    (signal 'gficl-app:restart-pipeline))
+  (set-idate app)
+  (with-slots (iglobaltime) app
+    (setq iglobaltime (glfw:get-time)))
+  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
 
-#+nil
-(run)
+(defmethod gficl-app:draw-fn ((app shadertoy-app))
+  (with-slots (idate iglobaltime iresolution data shader) app
+    (gl:clear :color-buffer)
+    (gl:uniformfv (gficl:shader-loc shader "IDATE")
+		  (map 'vector 'float idate))
+    (gl:uniformf (gficl:shader-loc shader "IGLOBALTIME")
+		 iglobaltime)
+    (gl:uniformfv (gficl:shader-loc shader "IRESOLUTION")
+		  iresolution)
+    (gficl:draw-vertex-data data)))
 
+(defun run ()
+  (gficl-app:start (make-instance 'shadertoy-app)))
+
+#||
+(setq $t (make-instance 'shadertoy-app))
+(gficl-app:start $t :title :width 700 :height 394)
+||#
 
 ;; redefine frag to a new fragment shader
 #+nil
-(defparameter *frag*  "// fragment-stage
+(replace-frag $t "// fragment-stage
 #version 460
 
 in _FROM_VERTEX_STAGE_
@@ -174,7 +187,3 @@ void main()
 }
 
 ")
-
-;; recompile shader with new *frag*
-#+nil
-(setq *recompile* t)
