@@ -114,7 +114,7 @@ void main()
     (when data (gficl:delete-gl data) (setq data nil))))
 
 (defmethod gficl-app:setup-fn ((app shadertoy-app))
-  (gficl-app:cleanup-fn app)
+  ;; (gficl-app:cleanup-fn app)
   (with-slots (data shader vertex-data-form quad vert frag) app
     (assert (and (not data) (not shader)))
     (setq data (gficl:make-vertex-data vertex-data-form quad))
