@@ -32,7 +32,9 @@ void main() {
    (shader-program
     :initform nil)
    (vertex-data
-    :initform nil)))
+    :initform nil))
+  (:default-initargs
+   :title "minimum"))
 
 (defmethod gficl-app:cleanup-fn ((app minimum-app))
   (with-slots (vertex-data shader-program) app

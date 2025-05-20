@@ -33,7 +33,55 @@
 
 (in-package "GFICL")
 
-(defclass gficl-app:base-app () ())
+;; gficl:with-window params
+(eval-when (:load-toplevel :compile-toplevel)
+(defvar +gficl-with-window-options+
+  '((title "window")
+    (width 500)
+    (height 300)
+    (visible t)
+    (cursor :normal (member :normal :hidden :disabled))
+    (vsync t)
+    (opengl-version-major 3)
+    (opengl-version-minor 3)
+    ;; end comapt options with gficl:start
+    ;; beg hints for cl-glfw3:create-window
+    (resizable t)
+    (decorated t)
+    (red-bits 8) (green-bits 8) (blue-bits 8) (alpha-bits 8)
+    (depth-bits 24) (stencil-bits 8)
+    (accum-red-bits 0) (accum-green-bits 0) (accum-blue-bits 0)
+    (accum-alpha-bits 0)
+    (aux-buffers 0)
+    (samples 0)
+    (refresh-rate 0)
+    (stereo nil)
+    (srgb-capable nil)
+    (client-api :opengl-api)
+    ;; conflicts with gficl:start :opengl-version-minor, :opengl-version-minor
+    ;; context-version-* overrides opengl-version*.
+    (context-version-major 3)
+    (context-version-minor 3)
+    (context-robustness :no-robustness)
+    (opengl-forward-compat nil)
+    (opengl-debug-context nil)
+    (opengl-profile :opengl-any-profile))
+  "Alist of gficl window options (name initform [type]")
+
+(defmacro define-class-from-options-alist (class-name options-alist)
+  "options-alist is evaluated with EVAL"
+  `(defclass ,class-name ()
+     ,(loop for (name initform type) in (eval options-alist)
+	    for initarg = (intern (symbol-name name) "KEYWORD")
+	    collect
+	    `(,name :initform ,initform
+		    :initarg ,initarg
+		    ,@(and type `(:type ,type))))))
+
+(define-class-from-options-alist gficl-window-options-mixin
+    +gficl-with-window-options+))
+
+(defclass gficl-app:base-app (gficl-window-options-mixin) ())
 
 (defgeneric gficl-app:setup-fn (base-app))
 (defgeneric gficl-app:update-fn (base-app)
@@ -56,21 +104,50 @@
 ;; gficl-app:setup-fn and re-entering the main loop).
 (define-condition gficl-app:restart-pipeline (condition) ())
 
+(define-condition gficl-app:quit (condition) ())
+
+(defun frob-window-options (window-options-mixin keys)
+  (when (getf keys :opengl-version-major)
+    (setf (getf keys :context-version-major)
+	  (getf keys :opengl-version-major)))
+  (when (getf keys :opengl-version-minor)
+    (setf (getf keys :context-version-minor)
+	  (getf keys :opengl-version-minor)))
+  ;; complicated defaulting behaviour: prefer supplied keys to slots,
+  ;; prefer context-version-* to opengl-version-*
+  (loop for (a b) in '((opengl-version-minor context-version-minor)
+		       (opengl-version-major context-version-major))
+	for x = (slot-value window-options-mixin a)
+	for y = (slot-value window-options-mixin b)
+	for k = (intern (symbol-name b) :keyword)
+	do (unless (getf keys k)
+	     (unless (= x y)
+	       (warn "preferring :~A ~A instead of conflicting :~A ~A" b y a x))
+	     (setf (getf keys k) y)))
+  (loop for (indicator default) in +gficl-with-window-options+
+	for key = (intern (symbol-name indicator) :keyword)
+	for val = (or (getf keys key)
+		      (slot-value window-options-mixin indicator))
+	append (list key val)))
+
+(defun plist-sans-keys (plist &rest keys) ; <3247672165664225@naggum.no>
+  (loop with sans for tail = (nth-value 2 (get-properties plist keys))
+	unless tail return (nreconc sans plist) do
+	(loop until (eq plist tail) do
+	      (push (pop plist) sans)
+	      (push (pop plist) sans))
+	(setq plist (cddr plist))))
+
 ;; macroexpands gficl:with-window
 (defmethod gficl-app:start ((base-app gficl-app:base-app)
-			    &key
-			    (title "window")
-			    (width 500)
-			    (height 300)
-			    (visible t)
-			    (cursor :normal) ;; normal, hidden, disabled
-			    (vsync t)
-			    (opengl-version-major 3)
-			    (opengl-version-minor 3))
+			    &rest keys ;; keys are frobbed from the slots of gficl-window-options-mixin.
+			    &key &allow-other-keys
+			    &aux (winparams (frob-window-options base-app keys)))
   (flet ((pre-window-fn () (gficl-app:pre-window-fn base-app))
 	 (resize-fn (w h) (gficl-app:resize-fn base-app w h)))
     (setq gficl::*state* (make-instance 'gficl::render-state
-			   :height height :width width
+			   :height (getf winparams :height)
+			   :width (getf winparams :width)
 			   :resize-fn #'resize-fn))
     (setq gficl::*active-objects* 0)
     (setq gficl::*shader-warnings* nil)
@@ -84,11 +161,14 @@
 	   (funcall #'pre-window-fn)
 	   (unwind-protect
 		(prog nil
-		   (cl-glfw3:create-window :title title :width width :height height :visible visible :context-version-major opengl-version-major :context-version-minor opengl-version-minor)
+		   (apply #'cl-glfw3:create-window
+			  (plist-sans-keys winparams
+			   :cursor :opengl-version-major :opengl-version-minor
+			   :vsync))
 		   (gficl::register-glfw-callbacks)
-		   (cl-glfw3:set-input-mode :cursor cursor)
+		   (cl-glfw3:set-input-mode :cursor (getf winparams :cursor))
 		   (%cl-glfw3:swap-interval
-		    (if vsync 1 0))
+		    (if (getf winparams :vsync) 1 0))
 		 reset
 		   (gficl-app:setup-fn base-app)
 		   (handler-case
