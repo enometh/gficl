@@ -172,14 +172,15 @@
 		    (if (getf winparams :vsync) 1 0))
 		 reset
 		   (gficl-app:setup-fn base-app)
-		   (handler-case
-		       (loop until (gficl:closedp)
-			     do (gficl-app:update-fn base-app)
-			     do (gficl-app:draw-fn base-app))
-		     (gficl-app:restart-pipeline (c)
-		       (declare (ignore c))
-		       (go reset)))
-		   (gficl-app:cleanup-fn base-app)
+		   (unwind-protect
+			(handler-case
+			    (loop until (gficl:closedp)
+				  do (gficl-app:update-fn base-app)
+				  do (gficl-app:draw-fn base-app))
+			  (gficl-app:restart-pipeline (c)
+			    (declare (ignore c))
+			    (go reset)))
+		     (gficl-app:cleanup-fn base-app))
 		   (if (not (= 0 gficl::*active-objects*))
 		       (format t
 			       "~%warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"

@@ -46,18 +46,18 @@ void main() {
       (setq shader-program nil))))
 
 (defmethod gficl-app:setup-fn ((app minimum-app))
+  ;; (gficl-app:cleanup-fn app)
   (with-slots (vertex-data
 	       vertex-data-form vertices shader-program
 	       vs-source fs-source)
       app
-    (gficl-app:cleanup-fn app)
+    (assert (and (not vertex-data) (not shader-program)))
     (setq vertex-data
 	  (gficl:make-vertex-data
 	   (gficl:make-vertex-form (list (gficl:make-vertex-slot 2 :float)))
 	   vertices))
-    (with-simple-restart (cont "Cont")
-      (setq shader-program
-	    (gficl:make-shader vs-source fs-source)))
+    (setq shader-program
+	  (gficl:make-shader vs-source fs-source))
     (gficl:bind-gl shader-program)))
 
 (defmethod gficl-app:draw-fn ((app minimum-app))
