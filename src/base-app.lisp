@@ -28,7 +28,8 @@
    "PRE-WINDOW-FN"
    "RESIZE-FN"
    "CLEANUP-FN"
-   "START"))
+   "START"
+   "RESTART-PIPELINE"))
 
 (in-package "GFICL")
 
@@ -48,6 +49,12 @@
   (:method ((base-app gficl-app:base-app) w h)))
 (defgeneric gficl-app:cleanup-fn (base-app)
   (:method ((base-app gficl-app:base-app))))
+
+;; signaling gficl-app:restart-pipeline (in say gficl-app:draw-fn, or
+;; gficl-app:upadte-fn) will cause the execution to break out of the
+;; gficl-app:start main loop, and restart the pipeline. (by calling
+;; gficl-app:setup-fn and re-entering the main loop).
+(define-condition gficl-app:restart-pipeline (condition) ())
 
 ;; macroexpands gficl:with-window
 (defmethod gficl-app:start ((base-app gficl-app:base-app)
@@ -76,21 +83,26 @@
 	 (progn
 	   (funcall #'pre-window-fn)
 	   (unwind-protect
-		(progn
-		  (cl-glfw3:create-window :title title :width width :height height :visible visible :context-version-major opengl-version-major :context-version-minor opengl-version-minor)
-		  (gficl::register-glfw-callbacks)
-		  (cl-glfw3:set-input-mode :cursor cursor)
-		  (%cl-glfw3:swap-interval
-		   (if vsync 1 0))
-		  (gficl-app:setup-fn base-app)
-		  (loop until (gficl:closedp)
-			do (gficl-app:update-fn base-app)
-			do (gficl-app:draw-fn base-app))
-		  (gficl-app:cleanup-fn base-app)
-		  (if (not (= 0 gficl::*active-objects*))
-		      (format t
-			      "~%warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
-			      gficl::*active-objects*)))
+		(prog nil
+		   (cl-glfw3:create-window :title title :width width :height height :visible visible :context-version-major opengl-version-major :context-version-minor opengl-version-minor)
+		   (gficl::register-glfw-callbacks)
+		   (cl-glfw3:set-input-mode :cursor cursor)
+		   (%cl-glfw3:swap-interval
+		    (if vsync 1 0))
+		 reset
+		   (gficl-app:setup-fn base-app)
+		   (handler-case
+		       (loop until (gficl:closedp)
+			     do (gficl-app:update-fn base-app)
+			     do (gficl-app:draw-fn base-app))
+		     (gficl-app:restart-pipeline (c)
+		       (declare (ignore c))
+		       (go reset)))
+		   (gficl-app:cleanup-fn base-app)
+		   (if (not (= 0 gficl::*active-objects*))
+		       (format t
+			       "~%warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
+			       gficl::*active-objects*)))
              (cl-glfw3:destroy-window)))
       (%cl-glfw3:terminate))))
 
