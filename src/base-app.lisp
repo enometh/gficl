@@ -145,6 +145,7 @@
 			    &aux (winparams (frob-window-options base-app keys)))
   (flet ((pre-window-fn () (gficl-app:pre-window-fn base-app))
 	 (resize-fn (w h) (gficl-app:resize-fn base-app w h)))
+    (assert (not gficl::*state*) nil "Only one APP at a time supported")
     (setq gficl::*state* (make-instance 'gficl::render-state
 			   :height (getf winparams :height)
 			   :width (getf winparams :width)
@@ -184,6 +185,7 @@
 			       "~%warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
 			       gficl::*active-objects*)))
              (cl-glfw3:destroy-window)))
+      (setq gficl::*state* nil)
       (%cl-glfw3:terminate))))
 
 
