@@ -77,7 +77,11 @@ void main()
    (iglobaltime :initform 0.0)
    (iresolution :initform #(0.0 0.0 0.0))
    (data :initform nil)
-   (shader :initform nil)))
+   (shader :initform nil))
+  (:default-initargs
+   :title "gficl shadertoy"
+   :width 700
+   :height 394))
 
 (defmethod set-idate ((app shadertoy-app))
   "set *iDate* to a v4 containing year month day second"
@@ -153,7 +157,8 @@ the interrupt should reset this to NIL.")
 
 #||
 (setq $t (make-instance 'shadertoy-app))
-(gficl-app:start $t :title :width 700 :height 394)
+(gficl-app:start $t)
+(gficl-app:start $t :title "window" :width 500 :height 300)
 ||#
 
 ;; redefine frag to a new fragment shader
