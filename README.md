@@ -40,7 +40,7 @@ window and updates and draws each frame.
   (gficl:with-window
    (:title "My App" :width 500 :height 400 :resize-callback #'my-resize-fn)
    (my-setup-fn)
-   (loop until (gficl:closed-p)
+   (loop until (gficl:closedp)
 	 do (my-update-fn)
 	 do (my-draw-fn))
    (my-cleanup-fn)))
