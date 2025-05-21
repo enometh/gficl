@@ -215,6 +215,12 @@ must be accurate."
     (setup-vertex-attrib-array vertex-form)
     (cffi:foreign-free vertex-data)
     (create-gl)
+
+    #||
+    ;;  "A VAO stores the glBindBuffer calls when the target is GL_ELEMENT_ARRAY_BUFFER. This also means it stores its unbind calls so make sure you don’t unbind the element array buffer before unbinding your VAO,otherwise it doesn’t have an EBO configured."
+    (gl:bind-buffer :array-buffer 0)
+    (gl:bind-vertex-array 0)
+    ||#
     (make-instance 'vertex-data :id vao :vbo vbo :ebo ebo
 		   :vao-alloced-p vao-alloced-p
 		   :index-count index-count
