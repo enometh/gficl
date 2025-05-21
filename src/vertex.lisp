@@ -168,7 +168,11 @@ vertex data has an index buffer or not, and whether instances is greater than 1.
   (if (ebo vertex-data)
       (if (> instances 1)
 	  (%gl:draw-elements-instanced (draw-mode vertex-data) vertices :unsigned-int 0 instances)
-	(%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0))
+	  (progn
+	    ;; ??? was: (%gl:draw-elements (draw-mode vertex-data) vertices :unsigned-int 0)
+	    (gl:bind-buffer :element-array-buffer (ebo vertex-data))
+	    (%gl:draw-elements (draw-mode vertex-data) (index-count vertex-data)
+			       :unsigned-int 0)))
     (if (> instances 1)
 	(%gl:draw-arrays-instanced (draw-mode vertex-data) 0 vertices instances)
 	(%gl:draw-arrays (draw-mode vertex-data) 0 vertices))))
