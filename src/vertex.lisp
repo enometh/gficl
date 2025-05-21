@@ -110,12 +110,13 @@ For any slots with undefined indices the order must match the vertex locations i
    (ebo :initarg :ebo :accessor ebo)
    (index-count :initarg :index-count :accessor index-count)
    (vertex-count :initarg :vertex-count :accessor vertex-count)
-   (draw-mode :initform :triangles :accessor draw-mode)))
+   (draw-mode :initform :triangles :accessor draw-mode)
+   (vao-alloced-p :initform nil :reader vao-alloced-p :initarg :vao-alloced-p)))
 
 (defmethod delete-gl ((obj vertex-data))
   (gl:delete-buffers (list (vbo obj)))
   (if (ebo obj) (gl:delete-buffers (list (ebo obj))))
-  (gl:delete-vertex-arrays (list (id obj)))
+  (if (vao-alloced-p obj)  (gl:delete-vertex-arrays (list (id obj))))
   (call-next-method))
 
 (defmethod bind-gl ((obj vertex-data))
@@ -174,13 +175,23 @@ vertex data has an index buffer or not, and whether instances is greater than 1.
 
 (declaim (ftype (function (vertex-form integer cffi:foreign-pointer integer cffi:foreign-pointer))
 		make-vertex-data-from-pointers))
+
+(defvar *vao* nil
+  "Enclosing vao")
+
+(defun vao () (and *vao* (numberp *vao*) (> *vao* 0) *vao*))
+
 (defun make-vertex-data-from-pointers
     (vertex-form vertex-data-size vertex-data index-count index-data)
   "Takes vertex and index data in raw pointer form.
 Vertex data is a foreign pointer, index data is a gl-array. Both are freed by this function.
 The raw data must match the supplied vertex-form and the index count and vertex data size
 must be accurate."
-  (let* ((vao (gl:gen-vertex-array))	 	 
+  (let* ((vao-alloced-p nil)
+	 (vao (let ((vao (vao)))
+		(cond (vao vao)
+		      (t (setq vao-alloced-p t)
+			 (gl:gen-vertex-array)))))
 	 (buffers (gl:gen-buffers 2))
 	 (vbo (elt buffers 0))
 	 (ebo (elt buffers 1)))
@@ -201,6 +212,7 @@ must be accurate."
     (cffi:foreign-free vertex-data)
     (create-gl)
     (make-instance 'vertex-data :id vao :vbo vbo :ebo ebo
+		   :vao-alloced-p vao-alloced-p
 		   :index-count index-count
 		   :vertex-count (/ vertex-data-size (vertex-mem-size vertex-form)))))
 
