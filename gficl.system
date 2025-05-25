@@ -92,3 +92,26 @@
 
 #+nil
 (mk:oos :gficl :load :compile-during-load t)
+
+(mk:defsystem :gficl-bt
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on (:gficl :bordeaux-threads)
+  :components ((:module "src"
+		:components ((:file "base-app-bt")))))
+
+#+nil
+(mk:oos :gficl-bt :load :compile-during-load t)
+
+(mk:defsystem :gficl-examples-bt
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on (:gficl-bt)
+  :components ((:module "examples"
+		:components ((:file "minimum-app")
+			     (:file "minimum-app-bt")))))
+
+#+nil
+(mk:oos :gficl-examples-bt :load :compile-during-load t)
