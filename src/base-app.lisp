@@ -29,7 +29,9 @@
    "RESIZE-FN"
    "CLEANUP-FN"
    "START"
-   "RESTART-PIPELINE"))
+   "RESTART-PIPELINE"
+   "QUIT"
+   ))
 
 (in-package "GFICL")
 
@@ -179,8 +181,12 @@
 				  do (gficl-app:draw-fn base-app))
 			  (gficl-app:restart-pipeline (c)
 			    (declare (ignore c))
-			    (go reset)))
+			    (go reset))
+			  (gficl-app:quit (c)
+			    (declare (ignore c))
+			    (go quit)))
 		     (gficl-app:cleanup-fn base-app))
+		 quit
 		   (if (not (= 0 gficl::*active-objects*))
 		       (format t
 			       "~%warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
