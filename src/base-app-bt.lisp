@@ -61,13 +61,21 @@
 		(setq task-queue nil)))))))
 
 (defmethod gficl-app:apply-in-thread ((app gficl-app:threaded-executor-mixin) func &rest args)
+  (with-slots (main-thread) app
+    (assert (bt:thread-alive-p main-thread)))
   (with-slots (task-queue-lock task-queue) app
     (bt:with-lock-held (task-queue-lock)
-      (push (lambda () (apply func args)) task-queue))))
+      (push (lambda () (apply func args)) task-queue))
+    :scheduled))
 
 (defvar gficl-app:*app* nil "Current GFICL-APP")
 
 (defmethod gficl-app:launch ((app gficl-app:threaded-executor-mixin) &rest args &key &allow-other-keys)
+  (if (typep gficl-app:*app* 'gficl-app:threaded-executor-mixin)
+      (with-slots (main-thread) gficl-app:*app*
+	(when (bt:threadp main-thread)
+	  (assert (not (bt:thread-alive-p main-thread)) nil
+	      "another gficl main-runner is running"))))
   (bt:make-thread (lambda ()
 		    (setq gficl-app:*app* app)
 		    (apply #'gficl-app:start app args))
