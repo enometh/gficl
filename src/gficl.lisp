@@ -12,17 +12,18 @@
   "returns the current window height"
   (win-height *state*))
 
-(defun toggle-fullscreen ()
+(defun toggle-fullscreen (&optional (windowed-borderless nil))
   "Changes the window from windowed to fullscreen or fullscreen to windowed
-depending on it's current state."
-  (set-fullscreen (not (fullscreen *state*))))
+depending on it's current state.
+If windowed-borderless is true then the fullscreen mode will be windowed without borders"
+  (set-fullscreen (not (fullscreen *state*)) windowed-borderless))
 
 (defmacro with-update ((&optional frame-time-var) &body body)
   "Polls input and window events. 
 frame-time-var gives the seconds since last update"
   (if frame-time-var
       `(let ((,frame-time-var (update-frame-time))) (update-render-state) (glfw:poll-events) ,@body)
-    `(progn (glfw:poll-events) ,@body (update-render-state))))
+    `(progn (update-render-state) (glfw:poll-events) ,@body)))
 
 (defmacro with-render (&body body)
   "enclose gl render calls, swaps the backbuffer at end."
@@ -62,6 +63,7 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
      (setf *state*
 	   (make-instance 'render-state :width ,width :height ,height :resize-fn ,resize-callback))
      (setf *active-objects* 0)
+     (setf *shader-warnings* nil)
      ;; keys found in glfw:create-window
      (glfw:with-init
       (funcall ,pre-window-fn)
@@ -77,8 +79,8 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
 	   (format t "~%Warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
 		   *active-objects*))))))
 
-(declaim (ftype (function (boolean)) set-fullscreen))
-(defun set-fullscreen (bool)
+(declaim (ftype (function (boolean boolean)) set-fullscreen))
+(defun set-fullscreen (bool windowed-borderless)
   (if (not (fullscreen *state*))
       (progn (setf (prev-width *state*) (window-width))
 	     (setf (prev-height *state*) (window-height))
@@ -95,8 +97,10 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
 	 (height (if bool (getf mode '%glfw::height)
 		   (prev-height *state*)))
 	 (refresh (if bool (getf mode '%glfw::refresh-rate) 0)))
-    (%glfw:set-window-monitor glfw:*window*
-			      monitor x y width height refresh)
+    (%glfw:set-window-monitor
+     glfw:*window*
+     (if windowed-borderless (cffi:null-pointer) monitor)
+     x y width height refresh)
     (setf (fullscreen *state*) bool)))
 
 ;;; ------------- GLFW CALLBACKS -----------------
@@ -104,12 +108,22 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
 (defun register-glfw-callbacks ()
   ;; set opengl pointer to lib loaded by glfw
   (setf %gl:*gl-get-proc-address* #'glfw:get-proc-address) 
-  (glfw:set-key-callback 'quit-with-esc)
+  (glfw:set-key-callback 'update-keys)
+  (glfw:set-cursor-position-callback 'update-cursor-pos)
+  (glfw:set-mouse-button-callback 'update-mouse-button-cb)
   (glfw:set-window-size-callback 'resize-callback))
 
-(glfw:def-key-callback quit-with-esc (window key scancode action mod-keys)
+(glfw:def-key-callback update-keys (window key scancode action mod-keys)
   (declare (ignore window scancode mod-keys))
   (update-key-state (render-input *state*) key action))
+
+(glfw:def-cursor-pos-callback update-cursor-pos (window x y)
+  (declare (ignore window))
+  (update-mouse-pos (render-input *state*) x y))
+
+(glfw:def-mouse-button-callback update-mouse-button-cb (window button action mod-keys)
+  (declare (ignore window mod-keys))
+  (update-mouse-buttons (render-input *state*) button action))
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))

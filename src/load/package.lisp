@@ -4,4 +4,6 @@
 		    (#:gltf #:org.shirakumo.fraf.gltf))
   (:export
    :model
-   :shader))
+   :image
+   :shader
+   :compute-shader))

@@ -17,6 +17,10 @@
     (loop for elem in data do (assert (numberp elem) () "~a is not a number." elem))
     (make-instance 'vec :data (make-array length :initial-contents data) :dimension length)))
 
+(declaim (ftype (function (vec) list) vec-data))
+(defun vec-data (vec)
+  (loop for x across (slot-value vec 'data) collecting x))
+
 (defmacro vec-ref (vec pos)
   `(assert (and (integerp ,pos) (> pos 0) (< pos (dimension ,vec))) ()
 	   "vec pos was out of range.")
@@ -44,9 +48,24 @@
   "Bind the vector to the location with name NAME in SHADER. make sure the SHADER is bound before calling this function."
   `(internal-bind-vec ,shader ,name (make-vec-if-list ,vec)))
 
+(defun internal-=vec (v1 v2 &rest vecs)
+  (loop initially (if (not (= (dimension v1) (dimension v2))) (return nil))
+	for x across (slot-value v1 'data)
+	for y across (slot-value v2 'data)
+	when (not (= x y)) do (return nil) finally (return t)))
+
+(defmacro =vec (v1 v2 &rest vecs)
+  "Check if a series of VEC objects have equal dimension and values."
+  `(loop for (a b) on
+	 (nconc (list (make-vec-if-list ,v1)
+		      (make-vec-if-list ,v2))
+		(list ,@(loop for v in vecs collecting `(make-vec-if-list ,v))))
+	 when (not (eql b nil)) when (not (internal-=vec a b)) do (return nil)
+	 finally (return t)))
+
 (declaim (ftype (function (vec vec) number) dot))
 (defun dot (v1 v2)
-  "dot product of two VECs, extra dimensions are ignored"
+  "dot product of two VECs, extra dimensions are ignored."
   (loop for x across (slot-value v1 'data)
 	for y across (slot-value v2 'data) summing
 	(* x y)))
@@ -59,9 +78,18 @@
 (declaim (ftype (function (vec &rest vec) (values vec &optional)) internal-+vec))
 (defun internal-+vec (vec &rest vecs)
   (if (not (car vecs)) vec
-    (apply #'internal-+vec (make-vec (loop for x across (slot-value vec 'data)
-					   for y across (slot-value (car vecs) 'data) collecting
-					   (+ x y)))
+    (apply #'internal-+vec
+	   (let ((v1 (slot-value vec 'data))
+		 (v2 (slot-value (car vecs) 'data)))
+	     (let* ((l1 (length v1))
+		    (l2 (length v2))
+		    (l (max l1 l2)))
+	       (cond ((not (= l1 l2))
+		      (setf v1 (adjust-array v1 l :initial-element 0))
+		      (setf v2 (adjust-array v2 l :initial-element 0)))))
+	     (make-vec (loop for x across v1
+			     for y across v2
+			     collecting (+ x y))))
 	   (cdr vecs))))
 
 (defmacro +vec (vec &rest vecs)

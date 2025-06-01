@@ -11,13 +11,24 @@
    #:toggle-fullscreen
    #:set-fullscreen
 
-   ;; input
+   ;;; Input
+   ;; keyboard
    #:key-down
    #:key-pressed
    #:map-keys-down
    #:map-keys-pressed
+   ;; mouse
+   #:mouse-pos
+   #:button-down
+   #:button-pressed
+   #:map-buttons-down
+   #:map-buttons-pressed
+
+   ;;hardware querying
+   #:msaa-samples
    
    ;; gl objects
+   #:gl-object
    #:id
    #:bind-gl
    #:delete-gl
@@ -39,16 +50,29 @@
    #:make-texture-with-fn
    #:get-image-format
 
+   ;; buffer
+   #:storage-buffer
+   #:make-storage-buffer
+   #:make-storage-buffer-from-array
+   #:bind-storage-buffer
+
+   ;; framebuffer attachment description
+   #:attachment-description
+   #:make-attachment-description
+   #:attach-desc-type
+   #:attach-desc-position
+   #:attach-desc-clear-bits
    ;; framebuffer
    #:framebuffer
-   #:make-attachment-description
    #:make-framebuffer
    #:blit-framebuffers
    #:framebuffer-texture-id
+   #:framebuffer-add-external-attachment
 
    ;; shader
    #:shader
    #:make-shader
+   #:make-compute-shader
    #:make-shader-from-path
    #:shader-loc
 
@@ -56,7 +80,9 @@
    #:vec
    #:bind-vec
    #:make-vec
+   #:vec-data
    #:vec-ref
+   #:=vec
    #:dot
    #:+vec
    #:-vec
@@ -84,6 +110,7 @@
    #:*mat
    #:+mat
    #:scalar*mat
+   #:mat*vec
    #:transpose-matrix
    #:cofactor-matrix
    #:determinant
@@ -98,4 +125,5 @@
    #:screen-orthographic-matrix
    #:perspective-matrix
    #:screen-perspective-matrix
-   #:target-resolution-matrix))
+   #:target-resolution-matrix
+   #:2d-rect-matrix))

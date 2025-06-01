@@ -94,7 +94,7 @@ void main() {
   (setf *target* (gficl:make-vec '(0 0 0)))
   (update-view 0)
   (gl:enable :cull-face :depth-test :multisample)
-  (gl:cull-face :front))
+  (gl:cull-face :back))
 
 (defun resize (w h)
   (gficl:bind-gl *main-shader*)
@@ -102,8 +102,8 @@ void main() {
     (gficl:screen-perspective-matrix w h (* pi 0.4) 0.1))
   (if *fb* (gficl:delete-gl *fb*))
   (setf *fb* (gficl:make-framebuffer
-	      (list (gficl:make-attachment-description :color-attachment0)
-		    (gficl:make-attachment-description :depth-stencil-attachment))
+	      (list (gficl:make-attachment-description)
+		    (gficl:make-attachment-description :position :depth-stencil-attachment))
 	      w h :samples (min 4 (gl:get-integer :max-samples)))))
 
 (defun cleanup ()
