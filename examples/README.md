@@ -60,3 +60,7 @@ Shows:
 - using depth only framebuffer textures
 - modifying framebuffer texture parameters
 - blitting multisampled depth buffer
+
+## Font Rendering
+
+A simple demo of how to render text
