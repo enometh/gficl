@@ -115,3 +115,25 @@
 
 #+nil
 (mk:oos :gficl-examples-bt :load :compile-during-load t)
+
+
+;;; ----------------------------------------------------------------------
+;;;
+;;; extra loaders
+;;;
+
+(mk:defsystem :gficl/load/imlib2
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on ( #+nil :gficl/load
+		(:feature :claw-imlib
+		 "claw-cxx-imlib2.bindings"))
+  :components ((:module "src/load"
+		:components (;; #+nil
+			     (:file "imlib2-min-x86_64-pc-linux-gnu"
+			      :if-feature (:not :claw-imlib))
+			     (:file "image-imlib2")))))
+
+#+nil
+(mk:oos :gficl/load/imlib2 :load :compile-during-load t)
