@@ -37,54 +37,58 @@ void main() {
 (defparameter *character-range* '(32 126))
 (defparameter *font-size* 100)
 (defparameter *font-dpi* 500)
-(defparameter *font-ht* nil)
 
-(defclass character-info ()
-  ((data :initarg :data)
-   (tex-offset :initarg :offset :type gficl:vec)
-   (position :initarg :size :type gficl:vec)
-   (advance :initarg :bearing :type gficl:vec)))
+(defclass text ()
+  ((texture :initarg :texture :accessor texture :type gficl:texture)
+   (w :initarg :w :type integer)
+   (h :initarg :h :type integer)
+   (min-x :initarg :min-x :type integer)
+   (max-y :initarg :max-y :type integer)))
+
+(defun make-text (texture w h min-x max-y)
+  (make-instance 'text :texture texture :w w :h h :min-x min-x :max-y max-y))
+
+(defun make-texture-from-pixarray (data)
+  (destructuring-bind
+   (h w) (print (array-dimensions data))
+   (cffi:with-foreign-pointer
+    (ptr (* w h))
+    (loop for x from 0 below w do
+	  (loop for y from 0 below h do
+		(setf (cffi:mem-aref ptr :unsigned-char
+				     (+ (* y w) x))
+		      (aref data y x))))
+    (gficl:make-texture w h :data ptr :wrap :clamp-to-edge :format :red))))
+
+(defun load-text (font-path text &key
+		       (font-size 100)
+		       (font-dpi 500))
+  (multiple-value-bind
+   (pixel-data min-x max-y w h)
+   (truetype-clx:text-pixarray font-path text font-size font-dpi font-dpi)
+   (if (not pixel-data) nil
+     (make-text (make-texture-from-pixarray pixel-data) w h min-x max-y))))
 
 (defun setup ()
   (gl:clear-color 0 1 0 0)
   (gl:enable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
   (setf *shader* (gficl:make-shader *vert-shader* *frag-shader*))
-  (setf *font-ht* nil)
-  (let ((tex-width 0) (tex-height 0))
-    (loop for i from (car *character-range*) to (cadr *character-range*) do
-	  (multiple-value-bind
-	   (data min-x max-y width height)
-	   (truetype-clx:text-pixarray *font-path* (string (code-char i))
-				       *font-size* *font-dpi* *font-dpi*)
-	   (format t "character : ~a is ~a , ~a x ~a , ~a    ~a~%" (code-char i)
-		   min-x width max-y height (if data (array-dimensions data) nil)))))
   
-  (loop for i from 65 to 65 do	
-	(let ((text (truetype-clx:text-pixarray *font-path* (string (code-char i)) 100 600 600)))
-	  (if text
-	      (destructuring-bind (h w) (array-dimensions text)
-				  (let ((data (cffi:foreign-alloc
-					       :unsigned-char :count (* w h))))
-				    (loop for x from 0 below w do
-					  (loop for y from 0 below h do
-						(setf (cffi:mem-aref data :unsigned-char
-								     (+ (* y w) x))
-						      (aref text y x))))
-				    (setf *tex*
-					  (gficl:make-texture w h :data data
-							      :wrap :clamp-to-edge
-							      :format :red))
-				    (cffi:foreign-free data))))))
   (setf *quad* (gficl:make-vertex-data
 		(gficl:make-vertex-form
 		 (list (gficl:make-vertex-slot 2 :float)))
 		'(((0 0)) ((1 0)) ((1 1)) ((0 1))) '(0 3 2 2 1 0)))
   (resize (gficl:window-width) (gficl:window-height))
-  (gficl:bind-matrix *shader* "model"
-		     (gficl:*mat
-		      (gficl:translation-matrix '(50 50 0))
-		      (gficl:scale-matrix '(300 300 1)))))
+
+  (let ((text (load-text *font-path* "Apples")))
+    (setf *tex* (texture text))
+    (with-slots (w h) text
+      (gficl:bind-matrix
+       *shader* "model"
+       (gficl:*mat
+	(gficl:translation-matrix '(0 0 0))
+	(gficl:scale-matrix (list (/ w 4) (/ h 4) 1)))))))
 
 (defun resize (w h)
   (gficl:bind-gl *shader*)

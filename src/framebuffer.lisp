@@ -26,12 +26,12 @@ returns NIL otherwise."
 	 (<= n max-attachments))))
 
 (deftype attachment-position ()
-	 '(or
-	   (member
-	    :depth-stencil-attachment
-	    :depth-attachment
-	    :stencil-attachment)
-	   (satisfies color-attachment-p)))
+  '(or
+    (member
+     :depth-stencil-attachment
+     :depth-attachment
+     :stencil-attachment)
+    (satisfies color-attachment-p)))
 
 (deftype attachment-type () '(member :texture :renderbuffer))
 
