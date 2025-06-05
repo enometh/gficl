@@ -38,4 +38,5 @@
 		((:file "package")
 		 (:file "model")
 		 (:file "shader")
-		 (:file "image")))))
+		 (:file "image")
+		 (:file "font")))))
