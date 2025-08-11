@@ -8,13 +8,14 @@
 ;;;
 ;;; - madhu 250514 - shaders from stacksmith/cepl-shadertoy
 ;;; - madhu 250520 - rewritten to use gficl-app:base-app lifecycle
+;;; - madhu 250811 - moved to gficl-app:base-app-bt lifecycle
 ;;;
 (defpackage #:gficl-examples/shadertoy
   (:use :cl)
   (:export #:run))
 (in-package :gficl-examples/shadertoy)
 
-(defclass shadertoy-app (gficl-app:base-app)
+(defclass shadertoy-app (gficl-app:base-app-bt)
   ((vert :initarg :vert
 	 :initform "// vertex-stage
 #version 460
@@ -93,14 +94,22 @@ void main()
       (replace idate (list year month date (glfw:get-time))))))
 
 (defmethod replace-shader ((app shadertoy-app) vert frag)
-  (with-slots ((main-shader shader)) app
+  "Internal. if shader is successfully compiled from vert and frag
+shader sources, the slots shader, vert and frag slots of APP are
+updated."
+  (with-slots ((main-shader shader) (main-vert vert) (main-frag frag))
+      app
     (let (shader)
       (with-simple-restart (cont "Cont")
 	(setq shader (gficl:make-shader vert frag)))
       (when shader
 	(when main-shader
 	  (gficl:delete-gl main-shader))
-	(setq main-shader shader)))))
+	(setq main-shader shader)
+	(unless (eql main-vert vert)
+	  (setq main-vert vert))
+	(unless (eql main-frag frag)
+	  (setq main-frag frag))))))
 
 (defmethod gficl-app:resize-fn ((app shadertoy-app) w h)
   (with-slots (iresolution shader) app
@@ -114,7 +123,8 @@ void main()
     (when data (gficl:delete-gl data) (setq data nil))))
 
 (defmethod gficl-app:setup-fn ((app shadertoy-app))
-  ;; (gficl-app:cleanup-fn app)
+  ;; (gficl-app:cleanup-fn app) ; NOTE cleanup is called automatically
+  ;; via unwind-protect in the main loop via gficl-app:start.
   (with-slots (data shader vertex-data-form quad vert frag) app
     (assert (and (not data) (not shader)))
     (setq data (gficl:make-vertex-data vertex-data-form quad))
@@ -122,20 +132,16 @@ void main()
   ;; call gficl:bind-gl through the resize function
   (gficl-app:resize-fn app (gficl:window-width) (gficl:window-height)))
 
-(defvar *recompile* nil
-  "Set to T during the main loop to interrupt the main loop and recompile
-the shader from current vert and frag strings. The code which processes
-the interrupt should reset this to NIL.")
-
 (defmethod replace-frag ((app shadertoy-app) fs-source)
-  (with-slots (frag) app
-    (setq frag fs-source)
-    (setq *recompile* t)))
+  (with-slots (vert) app
+    (gficl-app:apply-in-thread
+     app
+     (lambda (app vert frag)
+       (replace-shader app vert frag)
+       (signal 'gficl-app:restart-pipeline))
+     app vert fs-source)))
 
 (defmethod gficl-app:update-fn ((app shadertoy-app))
-  (when *recompile*
-    (setq *recompile* nil)
-    (signal 'gficl-app:restart-pipeline))
   (set-idate app)
   (with-slots (iglobaltime) app
     (setq iglobaltime (glfw:get-time)))
@@ -153,17 +159,19 @@ the interrupt should reset this to NIL.")
     (gficl:draw-vertex-data data)))
 
 (defun run ()
-  (gficl-app:start (make-instance 'shadertoy-app)))
+  (gficl-app:launch (make-instance 'shadertoy-app)))
 
 #||
+(run)
 (setq $t (make-instance 'shadertoy-app))
-(gficl-app:start $t)
-(gficl-app:start $t :title "window" :width 500 :height 300)
+(gficl-app:shutdown)
+(gficl-app:launch $t)
+(eq $t gficl-app:*app*)
 ||#
 
 ;; redefine frag to a new fragment shader
 #+nil
-(replace-frag $t "// fragment-stage
+(replace-frag gficl-app:*app* "// fragment-stage
 #version 460
 
 in _FROM_VERTEX_STAGE_
