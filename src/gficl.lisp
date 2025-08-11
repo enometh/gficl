@@ -77,7 +77,8 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
        ,@body
        (if (not (= 0 *active-objects*))
 	   (format t "~%Warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
-		   *active-objects*))))))
+		   *active-objects*))
+       (setq *state* nil)))))
 
 (declaim (ftype (function (boolean boolean)) set-fullscreen))
 (defun set-fullscreen (bool windowed-borderless)
