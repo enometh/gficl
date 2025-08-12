@@ -34,6 +34,18 @@
 #+nil
 (mk:oos :gficl-examples-shadertoy :load :compile-during-load t)
 
+(mk:defsystem :gficl-examples-shadertoys-extra
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on (:gficl-examples-shadertoy)
+  :components ((:module "examples/extra/"
+		:components ((:file "gficl-shadertoy-gtk4-demo")
+			     (:file "gficl-shadertoy-tbs")))))
+
+#+nil
+(mk:oos :gficl-examples-shadertoys-extra :load :compile-during-load t)
+
 (mk:defsystem :gficl/load
   :source-pathname *gficl-source-dir*
   :binary-pathname *gficl-binary-dir*
