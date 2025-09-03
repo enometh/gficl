@@ -2,7 +2,7 @@
 
 (defclass quaternion ()
   ((re :initarg :re :accessor re-quat :type number)
-   (im :initarg :im :accessor im-quat :type vector))
+   (im :initarg :im :accessor im-quat :type gficl:vec))
   (:documentation "A quaternion with a real number and an imaginary VEC"))
 
 (defmethod print-object ((obj quaternion) out)
