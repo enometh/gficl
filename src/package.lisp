@@ -38,6 +38,7 @@
    #:make-vertex-slot
    #:make-vertex-form
    ;; vertex data
+   #:draw-mode
    #:vertex-data
    #:make-vertex-data
    #:make-vertex-data-from-vectors
