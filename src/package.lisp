@@ -45,6 +45,10 @@
    #:make-vertex-data-from-pointers
    #:draw-vertex-data
 
+   #:vao
+   #:init-global-vao
+   #:reset-global-vao
+
    ;; image
    #:texture
    #:make-texture
