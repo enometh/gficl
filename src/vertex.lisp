@@ -185,6 +185,19 @@ vertex data has an index buffer or not, and whether instances is greater than 1.
 
 (defun vao () (and *vao* (numberp *vao*) (> *vao* 0) *vao*))
 
+;; a global vao records two gficl:vertex-data buffer operations.
+(defun init-global-vao ()
+  (assert (null (gficl::vao)))
+  (setq gficl::*vao*
+	(gl:gen-vertex-array))
+  (gl:bind-vertex-array gficl::*vao*))
+
+(defun reset-global-vao ()
+  (gl:bind-vertex-array 0)
+  (when (gficl::vao)
+    (gl:delete-vertex-arrays (list gficl::*vao*))
+    (setq gficl::*vao* nil)))
+
 (defun make-vertex-data-from-pointers
     (vertex-form vertex-data-size vertex-data index-count index-data)
   "Takes vertex and index data in raw pointer form.
