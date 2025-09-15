@@ -7,10 +7,13 @@
 ;;;   Copyright (C) 2025 Madhu.  All Rights Reserved.
 ;;;
 ;;; ;madhu 250811 - shaders from github.com patriciogonzalezvivo
-;;; thebookofshaders, glslCanvas, glslviewer. incomplete (texture
-;;; support TBD).
+;;; thebookofshaders, glslCanvas, glslviewer. (texture support via
+;;; u-tex-info.lisp).
 
 (in-package :gficl-examples/shadertoy)
+
+(eval-when (load eval compile)
+  (use-package "GFICL-U-TEX-INFO"))
 
 (defclass tbs-shadertoy-app (shadertoy-app)
   ((texcoords :initform
@@ -35,7 +38,9 @@
    (time-loc :initform nil)
    (resolution-loc :initform nil)
    (mouse-loc :initform nil)
-   (mouse :initform #(0.0 0.0)))
+   (mouse :initform #(0.0 0.0))
+   (u-textures :initform nil :initarg :u-textures)
+   (u-tex-infos :initform nil))
 
   (:default-initargs
    :title "TheBookOfShaders APP"
@@ -78,11 +83,18 @@ void main(){
 }
 "))
 
+(defmethod gficl-app:cleanup-fn :after ((app tbs-shadertoy-app))
+  (with-slots (u-tex-infos) app
+    (when u-tex-infos
+      (map nil 'u-tex-info-clear u-tex-infos)
+      (setq u-tex-infos nil))))
+
 (defmethod gficl-app:setup-fn ((app tbs-shadertoy-app))
   (with-slots (data
 	       texcoords vertcoords
 	       vertex-data-form
-	       shader  vert frag)
+	       shader  vert frag
+	       u-textures u-tex-infos)
       app
     (assert (and (not data) (not shader)))
     (prog nil
@@ -112,6 +124,25 @@ void main(){
       (setq time-loc (gficl:shader-loc shader "u_time"))
       (setq resolution-loc (gficl:shader-loc shader "u_resolution"))
       (setq mouse-loc (gficl:shader-loc shader "u_mouse")))
+
+    ;; u-textures is a list each element of which is either a pathname
+    ;; to a texture (which will be added with name u_texN) or a list
+    ;; of two elements of the form (NAME PATH), where a texture with
+    ;; pathname PATH with name NAME.
+    (loop for i from 0
+	  for u in u-textures do
+	  (let* ((u-tex (make-instance 'u-tex-info))
+		 (u-tex-name (if (consp u) (car u) (format nil "u_tex~D" i)))
+		 (u-tex-path (if (consp u) (cadr u) u))
+		 (u-tex-resolution-name (format nil "~A~A"
+						u-tex-name "Resolution")))
+	    (u-tex-info-init u-tex
+			     shader
+			     u-tex-name
+			     u-tex-path
+			     u-tex-resolution-name
+			     )
+	    (push u-tex u-tex-infos)))
     ;; call (gficl:bind-gl shader) via resize-fn on parent-class.
     (gficl-app:resize-fn app (gficl:window-width) (gficl:window-height))))
 
@@ -125,8 +156,9 @@ void main(){
 
 (defmethod gficl-app:draw-fn ((app tbs-shadertoy-app))
   (with-slots (data iglobaltime iresolution shader
-		    mouse
-		    time-loc resolution-loc mouse-loc)
+	       mouse
+	       time-loc resolution-loc mouse-loc
+	       u-tex-infos)
       app
     (gl:clear :color-buffer)
     (unless (= time-loc -1) (gl:uniformf time-loc iglobaltime))
@@ -134,6 +166,10 @@ void main(){
       (gl:uniformfv resolution-loc (subseq iresolution 0 2)))
     (unless (= mouse-loc -1)
       (gl:uniformfv mouse-loc mouse))
+    (loop for u in u-tex-infos
+	  do (with-slots (u-tex-loc u-tex-resolution-loc u-tex-resolution) u
+	       (when (and u-tex-loc (/= u-tex-loc -1) (/= u-tex-resolution-loc -1))
+		 (gl:uniformfv u-tex-resolution-loc (subseq u-tex-resolution 0 2)))))
     (gficl:draw-vertex-data data)))
 
 #||
@@ -154,3 +190,13 @@ void main() {
 #+nil
 (user:string->file (slot-value $t 'frag) "/dev/shm/1.fs")
 ;; glslViewer /dev/shm/1.fs
+
+#||
+(setq $t2
+      (make-instance 'tbs-shadertoy-app
+	:u-textures (list '("u_tex0" "/7/gtk/EXT-GL/thebookofshaders/src/moon/moon.jpg"))))
+(gficl-app:cleanup-fn $t2)
+(gficl-app:launch $t2)
+(gficl-app:shutdown)
+(replace-frag $t2 (alexandria:read-file-into-string "/7/gtk/EXT-GL/thebookofshaders/src/moon/moon.frag"))
+||#
