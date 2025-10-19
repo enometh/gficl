@@ -112,19 +112,20 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
   (glfw:set-key-callback 'update-keys)
   (glfw:set-cursor-position-callback 'update-cursor-pos)
   (glfw:set-mouse-button-callback 'update-mouse-button-cb)
-  (glfw:set-window-size-callback 'resize-callback))
+  (glfw:set-window-size-callback 'resize-callback)
+  (glfw:set-scroll-callback 'scroll-callback))
 
 (glfw:def-key-callback update-keys (window key scancode action mod-keys)
-  (declare (ignore window scancode mod-keys))
-  (update-key-state (render-input *state*) key action))
+  (declare (ignore window scancode))
+  (update-key-state (render-input *state*) key action mod-keys))
 
 (glfw:def-cursor-pos-callback update-cursor-pos (window x y)
   (declare (ignore window))
   (update-mouse-pos (render-input *state*) x y))
 
 (glfw:def-mouse-button-callback update-mouse-button-cb (window button action mod-keys)
-  (declare (ignore window mod-keys))
-  (update-mouse-buttons (render-input *state*) button action))
+  (declare (ignore window))
+  (update-mouse-buttons (render-input *state*) button action mod-keys))
 
 (glfw:def-window-size-callback resize-callback (window w h)
   (declare (ignore window))
@@ -133,3 +134,7 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
   (gl:viewport 0 0 w h)
   (if (not (or (= w 0) (= h 0)))
       (funcall (resize-fn *state*) w h)))
+
+(glfw:def-scroll-callback scroll-callback (window x y)
+  (declare (ignore window))
+  (update-scroll (render-input *state*) x y))
