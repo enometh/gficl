@@ -80,6 +80,7 @@
 		  -1.0 -1.0 0.0 1.0
 		  1.0 1.0 0.0 1.0
 		  1.0 -1.0 0.0 1.0))
+   (left-button-action :initform nil) ; used when *update-mouse-uniforms-in-update-fn* is t
    )
 
   (:default-initargs
@@ -165,13 +166,44 @@
   ;; call (gficl:bind-gl shader) via resize-fn (see parent class)
   (gficl-app:resize-fn app (gficl:window-width) (gficl:window-height)))
 
+(defvar *update-mouse-uniforms-in-update-fn* t
+  "If NIL, have to define methods on gficl::update-mouse-pos and
+gficl::update-ouse-buttons to update the values in the mouse slot. If
+non-NIL do it in gficl-app:update-fn.")
+
 (defmethod gficl-app:update-fn ((app gtk4-demo-shadertoy-app))
   (with-slots (iglobaltime timedelta frame) app
     (setq iglobaltime (glfw:get-time))
     (setq timedelta (float (gficl::update-frame-time)))
     (incf frame)			;XXXWTF
     )
-  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
+  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close)))
+  (when *update-mouse-uniforms-in-update-fn*
+    (with-slots (mouse iresolution left-button-action) app
+      (destructuring-bind (x y) (gficl:mouse-pos)
+	(setf (elt mouse 0) x)
+	(setf (elt mouse 1) (-  (elt iresolution 1) y)))
+      ;; on action press => mouse-state[button] := t
+      ;; on action release => mouse-state[button] := nil
+      ;; button-down-p => mouse-state[button] == t
+      ;; button-pressed-p => mouse-state[button] == t && prev-mouse-state[button == nil
+      (cond ((gficl:button-pressed :left)
+	     (assert (gficl:button-down :left))
+	     (unless left-button-action
+	       (setq left-button-action :press))
+	     (assert (eql left-button-action :press)))
+	    ((gficl:button-down :left)
+	     (assert (eql left-button-action :press)))
+	    (t (case left-button-action
+		 (:press (setq left-button-action :release))
+		 (:release (setq left-button-action nil)))))
+      (case left-button-action
+	(:press
+	 (setf (elt mouse 2) (elt mouse 0))
+	 (setf (elt mouse 3) (elt mouse 1)))
+	(:release
+	 (setf (elt mouse 2) (- (elt mouse 2)))
+	 (setf (elt mouse 3) (- (elt mouse 3))))))))
 
 (defmethod gficl-app:draw-fn ((app gtk4-demo-shadertoy-app))
   (with-slots (data
@@ -197,14 +229,18 @@
 ;; the following methods on gficl::input-state are f ugly, should we
 ;; use gficl:mouse-pos in update-fn instead?
 
+#+nil
 (defmethod gficl::update-mouse-pos :after ((state gficl::input-state) x y)
-  (when (typep gficl-app::*app* 'gtk4-demo-shadertoy-app)
+  (when (and (not *update-mouse-uniforms-in-update-fn*)
+	     (typep gficl-app::*app* 'gtk4-demo-shadertoy-app))
     (with-slots (mouse iresolution) gficl-app::*app*
       (setf (elt mouse 0) x)
       (setf (elt mouse 1) (-  (elt iresolution 1) y)))))
 
+#+nil
 (defmethod gficl::update-mouse-buttons :after ((state gficl::input-state) button action)
-  (when (and (typep gficl-app::*app* 'gtk4-demo-shadertoy-app)
+  (when (and (not *update-mouse-uniforms-in-update-fn*)
+	     (typep gficl-app::*app* 'gtk4-demo-shadertoy-app)
 	     (eql button :left))
     (with-slots (mouse iresolution) gficl-app::*app*
       (ecase action
@@ -224,5 +260,8 @@
 void mainImage(out vec4 fragColor, in vec2 fragCoord) { fragColor = vec4(0.0,0.8,0.8,1.0);};
 ")
 (replace-frag $t2 (user::slurp-file "/dev/shm/gtk4/demos/gtk-demo/alienplanet.glsl" nil :element-type 'character))
+(setq *update-mouse-uniforms-in-update-fn* t)
+(setq *update-mouse-uniforms-in-update-fn* nil)
+(slot-value $t2 'mouse)
 ||#
 
