@@ -31,6 +31,7 @@
    "START"
    "RESTART-PIPELINE"
    "QUIT"
+   "PROCESS-PENDING-EVENTS-STYLE"
    ))
 
 (in-package "GFICL")
@@ -83,13 +84,29 @@
 (define-class-from-options-alist gficl-window-options-mixin
     +gficl-with-window-options+))
 
-(defclass gficl-app:base-app (gficl-window-options-mixin) ())
+(defclass idle-renderer-mixin ()
+  ((process-pending-events-style :initform :poll :accessor gficl-app:process-pending-events-style
+				 :documentation
+				 "One of :poll or :wait or an integer (number of seconds) to pass to glfw:wait-events-timeout."
+				 :initarg :process-pending-events-style
+				 :type (or (integer 1) (eql :poll) (eql :wait)))))
+
+(defclass gficl-app:base-app (gficl-window-options-mixin
+			      idle-renderer-mixin)
+  ())
 
 (defgeneric gficl-app:setup-fn (base-app))
+
 (defgeneric gficl-app:update-fn (base-app)
   (:method :before ((base-app gficl-app:base-app))
+   (declare (optimize (speed 3)))
    (update-render-state)
-   (glfw:poll-events)))
+   (let ((style (gficl-app:process-pending-events-style base-app)))
+     (etypecase style
+       ((integer 0 100) (glfw:wait-events-timeout style))
+       ((member :poll) (glfw:poll-events))
+       ((member :wait) (glfw:wait-events))))))
+
 (defgeneric gficl-app:draw-fn (base-app)
   (:method :after ((base-app gficl-app:base-app))
    (glfw:swap-buffers)))
