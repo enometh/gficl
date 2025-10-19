@@ -23,6 +23,9 @@
    #:button-pressed
    #:map-buttons-down
    #:map-buttons-pressed
+   ;; modifiers & scroll
+   #:modifiers
+   #:scroll-state
 
    ;;hardware querying
    #:msaa-samples

@@ -57,6 +57,18 @@ Otherwise return as window pixel values."
 	    (list (to-ndc (if x x 0) (window-width))
 		  (to-ndc (if y y 0) (window-height)))))))
 
+;; Modifiers & Scoll
+
+(defun modifiers ()
+  "tracks :press and :release events of
+:{left,right}-{alt,shift,control,super} keys. returns that contains
+some (or none) of :{alt,shift,control,super}"
+  (slot-value (render-input *state*) 'modifier-state))
+
+(defun scroll-state ()
+  "returns zero or one of :scroll-{up,down,right,left}"
+  (slot-value (render-input *state*) 'scroll-state))
+
 ;; --- helpers ---
 
 (defun key-present (state key)

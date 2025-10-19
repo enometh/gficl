@@ -35,20 +35,44 @@
   (setf (slot-value (render-prev-input *state*) 'key-state)
 	(alexandria:copy-hash-table (slot-value (render-input *state*) 'key-state)))
   (setf (slot-value (render-prev-input *state*) 'mouse-state)
-	(alexandria:copy-hash-table (slot-value (render-input *state*) 'mouse-state))))
+	(alexandria:copy-hash-table (slot-value (render-input *state*) 'mouse-state)))
+  ;;(setf (slot-value (render-input *state*) 'modifier-state) nil)
+  (setf (slot-value (render-input *state*) 'scroll-state) nil))
 
 (defclass input-state ()
   ((key-state :initform (make-hash-table) :type hash-table)
-   (mouse-state :initform (make-hash-table) :type hash-table))
+   (mouse-state :initform (make-hash-table) :type hash-table)
+   (modifier-state :initform nil)
+   (scroll-state :initform nil))
   (:documentation "store previous frame's pressed keys."))
 
-(defgeneric update-key-state (state key action)
+(defun %update-modifier-state (input-state key-or-button action mod-keys)
+  "Actually we don't use mod-keys at all. We only track press and release
+events of a set of keys. def-key-callback and
+def-mouse-button-callback only give us mod-keys with the release
+event."
+  (flet ((key-to-mod (k)
+	   (case k
+	     ((:left-shift :right-shift) :shift)
+	     ((:left-alt :right-alt) :alt)
+	     ((:left-control :right-control) :control)
+	     ((:left-super :right-super) :super))))
+    (let ((k (key-to-mod key-or-button)))
+      (when k
+	(ecase action
+	  (:press (pushnew k (slot-value input-state 'modifier-state)))
+	  (:release (setf (slot-value input-state 'modifier-state)
+			  (delete k (slot-value input-state 'modifier-state)))))))))
+
+
+(defgeneric update-key-state (state key action mod-keys)
   (:documentation "handle a key input state change."))
 
-(defmethod update-key-state ((state input-state) key action)
+(defmethod update-key-state ((state input-state) key action mod-keys)
   (case action
 	(:press (setf (gethash key (slot-value state 'key-state)) t))
-	(:release (remhash key (slot-value state 'key-state)))))
+	(:release (remhash key (slot-value state 'key-state))))
+  (%update-modifier-state state key action mod-keys))
 
 (defgeneric update-mouse-pos (state x y)
   (:documentation "handle a mouse position change"))
@@ -58,14 +82,30 @@
     (setf (gethash :x mouse-state) x)
     (setf (gethash :y mouse-state) y)))
 
-(defgeneric update-mouse-buttons (state button action)
+(defgeneric update-mouse-buttons (state button action mod-keys)
   (:documentation "handle a mouse button state change."))
 
-(defmethod update-mouse-buttons ((state input-state) button action)
+(defmethod update-mouse-buttons ((state input-state) button action mod-keys)
   (with-slots (mouse-state) state
     (case action
 	  (:press (setf (gethash button mouse-state) t))
-	  (:release (remhash button mouse-state)))))
+	  (:release (remhash button mouse-state))))
+  (%update-modifier-state state button action mod-keys))
+
+(defgeneric update-scroll (state x y))
+
+(defmethod update-scroll ((state input-state) x y)
+  (with-slots (scroll-state) state
+    (setq scroll-state
+	  (cond ((zerop x)
+		 (cond ((zerop y) (warn "impossible!"))
+		       ((plusp y) :scroll-up)
+		       (t :scroll-down)))
+		((plusp x)
+		 (cond ((zerop y) :scroll-left)
+		       (t (warn "impossible!"))))
+		(t (cond ((zerop y) :scroll-right)
+			 (t (warn "impossible!"))))))))
 
 ;; --- hardware state ---
 
