@@ -172,6 +172,8 @@ gficl::update-ouse-buttons to update the values in the mouse slot. If
 non-NIL do it in gficl-app:update-fn.")
 
 (defmethod gficl-app:update-fn ((app gtk4-demo-shadertoy-app))
+  (gficl::debug-input-state (gficl::render-input gficl::*state*)
+			    :preface "update-fn ")
   (with-slots (iglobaltime timedelta frame) app
     (setq iglobaltime (glfw:get-time))
     (setq timedelta (float (gficl::update-frame-time)))
@@ -231,6 +233,7 @@ non-NIL do it in gficl-app:update-fn.")
 
 #+nil
 (defmethod gficl::update-mouse-pos :after ((state gficl::input-state) x y)
+  (gficl::debug-input-state state :preface "update-mouse-pos ")
   (when (and (not *update-mouse-uniforms-in-update-fn*)
 	     (typep gficl-app::*app* 'gtk4-demo-shadertoy-app))
     (with-slots (mouse iresolution) gficl-app::*app*
@@ -239,6 +242,7 @@ non-NIL do it in gficl-app:update-fn.")
 
 #+nil
 (defmethod gficl::update-mouse-buttons :after ((state gficl::input-state) button action)
+  (gficl::debug-input-state state :preface "update-mouse-buttons  ")
   (when (and (not *update-mouse-uniforms-in-update-fn*)
 	     (typep gficl-app::*app* 'gtk4-demo-shadertoy-app)
 	     (eql button :left))

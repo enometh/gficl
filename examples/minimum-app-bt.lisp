@@ -8,6 +8,7 @@
 
 (setq $t1 (make-instance 'minimum-app-bt))
 (gficl-app:launch $t1)
+(setf (gficl-app:process-pending-events-style $t1) :wait)
 
 (gficl-app:in-thread
   (setf (slot-value $t1 'vertices) $dn)

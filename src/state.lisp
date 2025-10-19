@@ -107,6 +107,38 @@ event."
 		(t (cond ((zerop y) :scroll-right)
 			 (t (warn "impossible!"))))))))
 
+;; for debugging. preface should end with a space.
+(defun debug-input-state (input-state &key (preface "") (skip-if-empty t))
+  (let (space-needed preface-done (stream t))
+    (labels ((ensure-preface ()
+	       (unless preface-done
+		 (when (and preface (> (length preface) 0))
+		   (assert (not space-needed))
+		   (format stream "~A" preface)
+		   (setq preface-done t)
+		   (setq space-needed nil))))
+	     (ensure-space ()
+	       (when space-needed
+		 (format stream " ")
+		 (setq space-needed nil)))
+	     (finish () (when space-needed (format stream "~%")))
+	     (fmt (fmt &rest args)
+	       (ensure-preface)
+	       (ensure-space)
+	       (apply #'format stream fmt args)
+	       (setq space-needed t)))
+      (with-slots (modifier-state scroll-state) input-state
+	(when modifier-state (fmt "mod: ~A" modifier-state))
+	(when scroll-state (fmt "scroll: ~A" scroll-state)))
+      (with-slots (key-state mouse-state) input-state
+	(unless (or (not skip-if-empty)
+		    (and (zerop (hash-table-count key-state))
+			 (member (hash-table-count mouse-state) '(0 2))))
+	  (fmt "~S"
+	       (list :key (sort (alexandria:hash-table-alist key-state) 'string< :key 'car)
+		     :mouse (sort (alexandria:hash-table-alist mouse-state) 'string< :key 'car)))))
+      (finish))))
+
 ;; --- hardware state ---
 
 (defparameter *max-msaa-samples* 0)
