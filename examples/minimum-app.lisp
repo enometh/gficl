@@ -67,7 +67,10 @@ void main() {
     (gficl:draw-vertex-data vertex-data)))
 
 (defmethod gficl-app:update-fn ((app minimum-app))
-  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
+  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close)))
+  #+nil
+  (gficl::debug-input-state (gficl::render-input gficl::*state*)
+			    :preface "update-fn "))
 
 (defun run ()
   (gficl-app:start (make-instance 'minimum-app)))
