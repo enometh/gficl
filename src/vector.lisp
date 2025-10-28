@@ -17,6 +17,11 @@
     (loop for elem in data do (assert (numberp elem) () "~a is not a number." elem))
     (make-instance 'vec :data (make-array length :initial-contents data) :dimension length)))
 
+(defmethod make-load-form ((obj vec) &optional env)
+  (make-load-form-saving-slots obj
+			       :slot-names '(data dimension)
+			       :environment env))
+
 (declaim (ftype (function (vec) list) vec-data))
 (defun vec-data (vec)
   (loop for x across (slot-value vec 'data) collecting x))
