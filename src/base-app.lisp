@@ -32,6 +32,7 @@
    "RESTART-PIPELINE"
    "QUIT"
    "PROCESS-PENDING-EVENTS-STYLE"
+   "DISABLE-DRAW-FN"
    ))
 
 (in-package "GFICL")
@@ -85,7 +86,8 @@
     +gficl-with-window-options+))
 
 (defclass idle-renderer-mixin ()
-  ((process-pending-events-style :initform :poll :accessor gficl-app:process-pending-events-style
+  ((disable-draw-fn :initform nil :accessor gficl-app:disable-draw-fn :initarg :disable-draw-fn :type boolean)
+   (process-pending-events-style :initform :poll :accessor gficl-app:process-pending-events-style
 				 :documentation
 				 "One of :poll or :wait or an integer (number of seconds) to pass to glfw:wait-events-timeout."
 				 :initarg :process-pending-events-style
@@ -195,7 +197,9 @@
 			(handler-case
 			    (loop until (gficl:closedp)
 				  do (gficl-app:update-fn base-app)
-				  do (gficl-app:draw-fn base-app))
+				  do (cond ((gficl-app:disable-draw-fn base-app)
+					    (sleep 1))
+					   (t (gficl-app:draw-fn base-app))))
 			  (gficl-app:restart-pipeline (c)
 			    (declare (ignore c))
 			    (go reset))
