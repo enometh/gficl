@@ -80,7 +80,7 @@ void main() {
 
 (defun run ()
   (gficl:with-window
-   (:title "font rendering" :width 600 :height 400 :resize-callback 'resize)
+   (:title "font rendering" :width 600 :height 400 :resize-callback #'resize)
    (setup)
    (loop until (gficl:closedp)
 	 do (update)
