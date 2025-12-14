@@ -6,9 +6,13 @@
 (setq $up '(((0 0.9)) ((-0.9 -0.9)) ((0.9 -0.9))))
 (setq $dn '(((0 -0.9)) ((0.9 0.9)) ((-0.9 0.9))))
 
+(setq gficl-app:*apps* nil)
 (setq $t1 (make-instance 'minimum-app-bt))
 (gficl-app:launch $t1)
 (setf (gficl-app:process-pending-events-style $t1) :wait)
+
+(setq $t2 (make-instance 'minimum-app-bt))
+(gficl-app:launch $t2)
 
 (gficl-app:in-thread
   (setf (slot-value $t1 'vertices) $dn)
