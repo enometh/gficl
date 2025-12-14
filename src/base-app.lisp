@@ -17,6 +17,22 @@
 ;;; render loop.  Other lisp opengl frameworks seem to go down this
 ;;; rabbithole with mixed results, so there is motivation to see how
 ;;; bad an implementation this results in.
+;;;
+;;; ;madhu 251214 Multiple Windows on GLFW3.  intro.dox states "The
+;;; reference documentation for every GLFW function states whether it
+;;; is limited to the main thread.  "Initialization, termination,
+;;; event processing and the creation and destruction of windows,
+;;; cursors and OpenGL and OpenGL ES contexts are all restricted to
+;;; the main thread due to limitations of one or several platforms."
+;;;
+;;; Linux does not seem to be one of these platforms, and we can get
+;;; away with running multiple windows each with its own gl context
+;;; (made current with cl-glfw3:make-context-current) in separate
+;;; threads.  However gficl still uses global state and the variables
+;;; *state*, *active-windows*, and *shader-warnings* probably need be
+;;; thread local. cl-glfw3:*window* which implicitly used has to be
+;;; thread local.
+
 
 (defpackage "GFICL-APP"
   (:use)
@@ -33,6 +49,7 @@
    "QUIT"
    "PROCESS-PENDING-EVENTS-STYLE"
    "DISABLE-DRAW-FN"
+   "*APPS*"
    ))
 
 (in-package "GFICL")
@@ -159,14 +176,17 @@
 	      (push (pop plist) sans))
 	(setq plist (cddr plist))))
 
+(defvar gficl-app:*apps* nil "List of running gficl-apps")
+
 ;; macroexpands gficl:with-window
 (defmethod gficl-app:start ((base-app gficl-app:base-app)
 			    &rest keys ;; keys are frobbed from the slots of gficl-window-options-mixin.
 			    &key &allow-other-keys
 			    &aux (winparams (frob-window-options base-app keys)))
+  (with-simple-restart (cont "Cont")
+    (assert (not (find base-app gficl-app:*apps*)) nil "already registered"))
   (flet ((pre-window-fn () (gficl-app:pre-window-fn base-app))
 	 (resize-fn (w h) (gficl-app:resize-fn base-app w h)))
-    (assert (not gficl::*state*) nil "Only one APP at a time supported")
     (setq gficl::*state* (make-instance 'gficl::render-state
 			   :height (getf winparams :height)
 			   :width (getf winparams :width)
@@ -178,6 +198,7 @@
       (unless (cffi-sys:null-pointer-p cl-glfw3::prev-error-fun)
 	(%cl-glfw3:set-error-callback cl-glfw3::prev-error-fun)))
     (cl-glfw3:initialize)
+    (push base-app gficl-app:*apps*)
     (unwind-protect
 	 (progn
 	   (funcall #'pre-window-fn)
@@ -212,9 +233,11 @@
 		       (format t
 			       "~%warning: ~a gl object~:p ~:*~[ ~;was~:;were~] not freed~%"
 			       gficl::*active-objects*)))
-             (cl-glfw3:destroy-window)))
+             (cl-glfw3:destroy-window)
+	     (setq gficl-app:*apps* (delete base-app gficl-app:*apps*))))
       (setq gficl::*state* nil)
-      (%cl-glfw3:terminate))))
+      (when (endp gficl-app:*apps*)
+	(%cl-glfw3:terminate)))))
 
 
 #+nil ;; if system somehow gets wedged with a stale *state* (unclean

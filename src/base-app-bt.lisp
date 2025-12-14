@@ -29,7 +29,6 @@
 	  '("THREADED-EXECUTOR-MIXIN"
 	    "APPLY-IN-THREAD"
 	    "LAUNCH"
-	    "*APP*"
 	    "IN-THREAD"
 	    "RESTART-PIPELINE"
 	    "SHUTDOWN"
@@ -68,30 +67,36 @@
       (push (lambda () (apply func args)) task-queue))
     :scheduled))
 
-(defvar gficl-app:*app* nil "Current GFICL-APP")
-
 (defmethod gficl-app:launch ((app gficl-app:threaded-executor-mixin) &rest args &key &allow-other-keys)
-  (if (typep gficl-app:*app* 'gficl-app:threaded-executor-mixin)
-      (with-slots (main-thread) gficl-app:*app*
-	(when (bt:threadp main-thread)
-	  (assert (not (bt:thread-alive-p main-thread)) nil
-	      "another gficl main-runner is running"))))
-  (bt:make-thread (lambda ()
-		    (setq gficl-app:*app* app)
-		    (apply #'gficl-app:start app args))
-		  :name (format nil "gficl-main-runner for ~A" app)))
+  (with-slots (main-thread) app
+    (when (bt:threadp main-thread)
+      (assert (not (bt:thread-alive-p main-thread)) nil
+	  "gficl main-runner is running")))
+  (let ((bt:*default-special-bindings*
+	 `((gficl::*state* . ,gficl::*state*)
+	   (gficl::*active-objects* . ,gficl::*active-objects*)
+	   (gficl::*shader-warnings* . ,gficl::*shader-warnings*)
+	   (gficl::*vao* . ,gficl::*vao*)
+	   (cl-glfw3:*window* . ,cl-glfw3:*window*)
+	   (gficl::*max-msaa-samples* . ,gficl::*max-msaa-samples*))))
+    (bt:make-thread (lambda ()
+		      (apply #'gficl-app:start app args))
+		    :name (format nil "gficl-main-runner for ~A" app))))
 
-(defmacro gficl-app:in-thread (&body body)
-  `(progn (check-type gficl-app:*app* gficl-app:threaded-executor-mixin)
-	  (with-slots (main-thread) gficl-app:*app*
-	    (assert (bt:thread-alive-p main-thread)))
-	  (gficl-app:apply-in-thread gficl-app:*app* (lambda () ,@body))))
+;; ;madhu 251214 changed in-thread signature to always use the app
+(defmacro gficl-app:in-thread (app &body body)
+  (let ((app-var (gensym)))
+    `(let ((,app-var ,app))
+       (check-type ,app-var gficl-app:threaded-executor-mixin)
+       (with-slots (main-thread) ,app-var
+	 (assert (bt:thread-alive-p main-thread)))
+       (gficl-app:apply-in-thread ,app-var (lambda () ,@body)))))
 
-(defun gficl-app:shutdown ()
-  (gficl-app:in-thread  (signal 'gficl-app:quit)))
+(defun gficl-app:shutdown (app)
+  (gficl-app:in-thread app  (signal 'gficl-app:quit)))
 
-(defun gficl-app:restart-pipeline ()
-  (gficl-app:in-thread (signal 'gficl-app:restart-pipeline)))
+(defun gficl-app:restart-pipeline (app)
+  (gficl-app:in-thread app (signal 'gficl-app:restart-pipeline)))
 
 
 (defclass gficl-app:base-app-bt
