@@ -134,7 +134,9 @@
   :depends-on (:gficl-bt)
   :components ((:module "examples"
 		:components ((:file "minimum-app")
-			     (:file "minimum-app-bt")))))
+			     (:file "minimum-app-bt")
+			     (:module "extra"
+			      :components ((:file "immediate-mode-shim")))))))
 
 #+nil
 (mk:oos :gficl-examples-bt :load :compile-during-load t)
