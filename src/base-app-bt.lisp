@@ -102,3 +102,39 @@
 (defclass gficl-app:base-app-bt
     (gficl-app:base-app gficl-app:threaded-executor-mixin)
   ())
+
+#+lem-mailbox
+(eval-when (:load-toplevel :compile-toplevel :execute)
+  (export '(gficl-app::call-in-thread-sync
+	    gficl-app::in-thread-sync
+	    gficl-app::*call-in-thread-sync-timeout*
+	    gficl-app::*call-in-thread-sync-break-on-errors*)
+	  "GFICL-APP"))
+
+#+lem-mailbox
+(progn
+(defvar gficl-app:*call-in-thread-sync-break-on-errors* nil)
+(defvar gficl-app:*call-in-thread-sync-timeout* 6)
+(defun gficl-app:call-in-thread-sync (app func)
+  (let ((mailbox (lem-mailbox:make-mailbox)))
+    (gficl-app:in-thread app
+      (let (result errorp error)
+	 (unwind-protect
+	      (prog nil
+		 (handler-bind ((error (lambda (e)
+					 (setq errorp t error e)
+					 (if gficl-app:*call-in-thread-sync-break-on-errors*
+					     nil
+					     (go done)))))
+		   (setq result (multiple-value-list (funcall func))))
+		 done)
+	   (lem-mailbox:send-message mailbox (list result errorp error)))))
+    (multiple-value-bind (result-values successp)
+	(lem-mailbox:receive-message mailbox :timeout gficl-app:*call-in-thread-sync-timeout*)
+      (cond (successp (destructuring-bind (result-values errorp error) result-values
+			(cond (errorp (error "CALL-IN-THREAD-SYNC failed with ~S ~A" error error))
+			      (t (values-list result-values)))))
+	    (t (error "CALL-IN-THREAD-SYNC timed out"))))))
+
+(defmacro gficl-app:in-thread-sync (app &body body)
+  `(gficl-app:call-in-thread-sync ,app (lambda () ,@body))))
