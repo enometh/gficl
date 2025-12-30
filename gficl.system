@@ -116,11 +116,13 @@
 #+nil
 (mk:oos :gficl :load :compile-during-load t)
 
+(pushnew :lem-mailbox *features*)
+
 (mk:defsystem :gficl-bt
   :source-pathname *gficl-source-dir*
   :binary-pathname *gficl-binary-dir*
   :source-extension "lisp"
-  :depends-on (:gficl :bordeaux-threads)
+  :depends-on (:gficl :bordeaux-threads (:feature :lem-mailbox :lem-mailbox))
   :components ((:module "src"
 		:components ((:file "base-app-bt")))))
 
