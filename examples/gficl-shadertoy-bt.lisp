@@ -166,12 +166,12 @@ updated."
 (setq $t (make-instance 'shadertoy-app))
 (gficl-app:shutdown)
 (gficl-app:launch $t)
-(eq $t gficl-app:*app*)
+(eq $t (elt gficl-app:*apps* 0))
 ||#
 
 ;; redefine frag to a new fragment shader
 #+nil
-(replace-frag gficl-app:*app* "// fragment-stage
+(replace-frag (elt gficl-app:*apps* 0) "// fragment-stage
 #version 460
 
 in _FROM_VERTEX_STAGE_
