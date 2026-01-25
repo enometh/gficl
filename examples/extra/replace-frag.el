@@ -9,7 +9,7 @@
 
 (defun %gficl-replace-frag (string)
   (sly-eval-async `(gficl-examples/shadertoy::replace-frag
-		    gficl-app::*app*
+		    (cl:elt gficl-app::*apps* 0)
 		    ,string)
       (lambda (result)
 	(message "%%gficl-replace frag returned %S" result))))

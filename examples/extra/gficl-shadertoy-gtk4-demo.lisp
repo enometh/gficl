@@ -235,8 +235,8 @@ non-NIL do it in gficl-app:update-fn.")
 (defmethod gficl::update-mouse-pos :after ((state gficl::input-state) x y)
   (gficl::debug-input-state state :preface "update-mouse-pos ")
   (when (and (not *update-mouse-uniforms-in-update-fn*)
-	     (typep gficl-app::*app* 'gtk4-demo-shadertoy-app))
-    (with-slots (mouse iresolution) gficl-app::*app*
+	     (typep (elt gficl-app::*apps* 0) 'gtk4-demo-shadertoy-app))
+    (with-slots (mouse iresolution) (elt gficl-app::*apps* 0)
       (setf (elt mouse 0) x)
       (setf (elt mouse 1) (-  (elt iresolution 1) y)))))
 
@@ -244,9 +244,9 @@ non-NIL do it in gficl-app:update-fn.")
 (defmethod gficl::update-mouse-buttons :after ((state gficl::input-state) button action)
   (gficl::debug-input-state state :preface "update-mouse-buttons  ")
   (when (and (not *update-mouse-uniforms-in-update-fn*)
-	     (typep gficl-app::*app* 'gtk4-demo-shadertoy-app)
+	     (typep (elt gficl-app::*apps* 0) 'gtk4-demo-shadertoy-app)
 	     (eql button :left))
-    (with-slots (mouse iresolution) gficl-app::*app*
+    (with-slots (mouse iresolution) (elt gficl-app::*apps* 0)
       (ecase action
 	(:press
 	 (setf (elt mouse 2) (elt mouse 0))

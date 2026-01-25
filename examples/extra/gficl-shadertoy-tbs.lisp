@@ -176,7 +176,7 @@ void main(){
 (gficl-app:cleanup-fn $t1)
 (gficl-app:shutdown)
 (setq $t1 (make-instance 'tbs-shadertoy-app))
-(eql $t1 gficl-app:*app*)
+(eql $t1 (elt gficl-app:*apps*) 0)
 (gficl-app:launch $t1)
 ||#
 
