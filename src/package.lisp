@@ -119,6 +119,7 @@
    #:scale-matrix
    #:translation-matrix
    #:2d-rotation-matrix
+   #:2d-rect-matrix
    #:change-of-basis-matrix
    #:view-matrix
    #:orthographic-matrix

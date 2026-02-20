@@ -156,6 +156,25 @@
      (0 0 1 0)
      (0 0 0 1))))
 
+(declaim (ftype (function (vec
+			   &key (:depth number) (:rotation number) (:pivot vec)))
+		2d-rect-matrix))
+(defun 2d-rect-matrix (rect &key (depth 0) (rotation 0) (pivot (gficl:make-vec '(0 0))))
+  (assert (= (dimension rect) 4) ()
+	  "~% rect vec must have 4 components: (x y w h)" rect)
+  (destructuring-bind (x y w h) (vec-data rect)
+    (gficl:*mat
+     (gficl:translation-matrix (list x y depth))
+     (if (not (= rotation 0))
+	 (let ((px (gficl:vec-ref pivot 0))
+	       (py (gficl:vec-ref pivot 1)))
+	   (gficl:*mat
+	    (gficl:translation-matrix (list px py 0))
+	    (gficl:2d-rotation-matrix rotation)
+	    (gficl:translation-matrix (list (- px) (- py) 0))))
+       (gficl:make-matrix))
+     (gficl:scale-matrix (list w h 1)))))
+
 (declaim (ftype (function (vec vec vec) (values matrix &optional)) create-change-of-basis-matrix))
 (defun create-change-of-basis-matrix (v1 v2 v3)
   (assert-min-dim 3 v1 v2 v3)
