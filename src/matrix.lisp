@@ -233,7 +233,7 @@ returns as values the view matrix, the left vector, and the up vector."
 	  "ortho width and height must be positive: ~ax~a" width height)
   (orthographic-matrix 0 height 0 width near far))
 
-(declaim (ftype (function (number number number number number &optional number) matrix)
+(declaim (ftype (function (number number number number number &optional t) matrix)
 		perspective-matrix))
 (defun perspective-matrix (top bottom left right near &optional far)
   "create a 4x4 perspective projection MATRIX, far plane at infinity if not given."
@@ -261,6 +261,25 @@ fov is in radians."
     (let ((ratio (/ (* current-width final-height) (* current-height final-width))))
     (gficl:scale-matrix
      (list (if (< ratio 1) ratio 1) (if (> ratio 1) (/ 1 ratio) 1) 1))))
+
+(declaim (ftype (function (vec
+			   &key (:depth number) (:rotation number) (:pivot vec)))
+		2d-rect-matrix))
+(defun 2d-rect-matrix (rect &key (depth 0) (rotation 0) (pivot (gficl:make-vec '(0 0))))
+  (assert (= (dimension rect) 4) ()
+	  "~% rect vec must have 4 components: (x y w h)" rect)
+  (destructuring-bind (x y w h) (vec-data rect)
+    (gficl:*mat
+     (gficl:translation-matrix (list x y depth))
+     (let ((px (gficl:vec-ref pivot 0))
+	   (py (gficl:vec-ref pivot 1)))
+       (if (not (= rotation 0))
+	   (gficl:*mat
+	    (gficl:translation-matrix (list px py 0))
+	    (gficl:2d-rotation-matrix rotation)
+	    (gficl:translation-matrix (list (- px) (- py) 0)))
+	 (gficl:make-matrix)))
+     (gficl:scale-matrix (list w h 1)))))
 
 ;;; --- set shader matrices ---
 

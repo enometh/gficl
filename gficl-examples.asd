@@ -6,10 +6,7 @@
   :build-pathname "shadows"
   :entry-point "gficl-examples/shadows:run"
   :depends-on (:gficl
-	       ;; for model loading examples
-	       :gficl/load
-	       ;; for font loading example
-	       :truetype-clx)
+	       :gficl/load)
   :components ((:module "examples"
 		:components
 		((:file "package")

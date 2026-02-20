@@ -30,10 +30,13 @@
 	       :cl-gltf
 	       ;; images
 	       :pngload
-	       :cl-jpeg)
+	       :cl-jpeg
+	       ;; fonts
+	       :truetype-clx)
   :components ((:module "src/load"
 		:components
 		((:file "package")
 		 (:file "model")
 		 (:file "shader")
-		 (:file "image")))))
+		 (:file "image")
+		 (:file "font")))))
