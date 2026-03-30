@@ -168,3 +168,18 @@
 
 #+nil
 (mk:oos :gficl/load/imlib2 :load :compile-during-load t)
+
+#+nil
+(load "~/cl/extern/claw-cxx-ft/claw-cxx-ft.bindings.system")
+
+(mk:defsystem :gficl/load/ft2
+  :source-pathname *gficl-source-dir*
+  :binary-pathname *gficl-binary-dir*
+  :source-extension "lisp"
+  :depends-on ("claw-cxx-ft.bindings" "gficl-bt")
+  :components ((:module "src/load"
+		:components ((:file "freetype2")))))
+
+#+nil
+(mk:oos :gficl/load/ft2 :load :compile-during-load t)
+
