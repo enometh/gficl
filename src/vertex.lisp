@@ -287,3 +287,11 @@ Move vertex data vertex by vertex and check that the form matches the vertex for
 	     nil
 	     (if (< (slot-stride slot) 0) vertex-size (slot-stride slot))
 	     (cffi:make-pointer offset))))))
+
+(defun send (vertex-data-object vertex-data-pointer offset size)
+  "KLUDGE. gl-buffer-subdata on an already created vertex-data object."
+  (with-slots ((vao id) vbo ebo index-count vertex-count draw-mode vao-alloced-p)
+      vertex-data-object
+    (gl:bind-vertex-array vao)
+    (gl:bind-buffer :array-buffer vbo)
+    (%gl:buffer-sub-data :array-buffer offset size vertex-data-pointer)))

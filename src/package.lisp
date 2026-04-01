@@ -51,6 +51,7 @@
    #:vao
    #:init-global-vao
    #:reset-global-vao
+   #:send
 
    ;; image
    #:texture
