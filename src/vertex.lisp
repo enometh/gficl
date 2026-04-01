@@ -122,8 +122,8 @@ For any slots with undefined indices the order must match the vertex locations i
 (defmethod bind-gl ((obj vertex-data))
   (gl:bind-vertex-array (id obj)))
 
-(declaim (ftype (function (vertex-form list &optional list) (values vertex-data &optional)) make-vertex-data))
-(defun make-vertex-data (vertex-form vertices &optional indices)
+(declaim (ftype (function (vertex-form list &optional list (or keyword null)) (values vertex-data &optional)) make-vertex-data))
+(defun make-vertex-data (vertex-form vertices &optional indices usage)
   "Create vertex data using the verticies matching vertex-form.
 I.e if a vertex is a position and a uv, three vertices looks like:
 '(((0 0 0) (0 0))
@@ -135,12 +135,13 @@ Optionally supply a list of integers as indicies for an index buffer."
    (* (length vertices) (vertex-mem-size vertex-form))
    (vertex-list-to-array vertex-form vertices)
    (length indices)
-   (if indices (cffi:foreign-alloc :int :initial-contents indices) (cffi:null-pointer))))
+   (if indices (cffi:foreign-alloc :int :initial-contents indices) (cffi:null-pointer))
+   usage))
 
-(declaim (ftype (function (vertex-form vector &optional (or vector nil))
+(declaim (ftype (function (vertex-form vector &optional (or vector null) (or keyword null))
 			  (values vertex-data &optional))
 		make-vertex-data-from-vectors))
-(defun make-vertex-data-from-vectors (vertex-form vertices &optional indices)
+(defun make-vertex-data-from-vectors (vertex-form vertices &optional indices usage)
   "Create vertex data using vectors of verticies and optionally indices.
 The vertex and index data is a flat vector of floats and integers, respectively.
 When indicies is null or empty, an index buffer won't be created."
@@ -151,7 +152,8 @@ When indicies is null or empty, an index buffer won't be created."
      (cffi:foreign-alloc :float :initial-contents vertices)
      index-count
      (if (> index-count 0)
-	 (cffi:foreign-alloc :int :initial-contents indices) (cffi:null-pointer)))))
+	 (cffi:foreign-alloc :int :initial-contents indices) (cffi:null-pointer))
+     usage)))
 
 (declaim (ftype (function (vertex-data &key (vertices number)))))
 (defun draw-vertex-data (vertex-data &key (vertices 0 vertp) (instances 1))
@@ -177,7 +179,7 @@ vertex data has an index buffer or not, and whether instances is greater than 1.
 	(%gl:draw-arrays-instanced (draw-mode vertex-data) 0 vertices instances)
 	(%gl:draw-arrays (draw-mode vertex-data) 0 vertices))))
 
-(declaim (ftype (function (vertex-form integer cffi:foreign-pointer integer cffi:foreign-pointer))
+(declaim (ftype (function (vertex-form integer cffi:foreign-pointer integer cffi:foreign-pointer &optional (or keyword null)))
 		make-vertex-data-from-pointers))
 
 (defvar *vao* nil
@@ -199,7 +201,7 @@ vertex data has an index buffer or not, and whether instances is greater than 1.
     (setq gficl::*vao* nil)))
 
 (defun make-vertex-data-from-pointers
-    (vertex-form vertex-data-size vertex-data index-count index-data)
+    (vertex-form vertex-data-size vertex-data index-count index-data &optional usage)
   "Takes vertex and index data in raw pointer form.
 Vertex data is a foreign pointer, index data is a gl-array. Both are freed by this function.
 The raw data must match the supplied vertex-form and the index count and vertex data size
@@ -216,12 +218,12 @@ must be accurate."
     (gl:bind-buffer :array-buffer vbo)
     (%gl:buffer-data :array-buffer
 		     vertex-data-size
-		     vertex-data :static-draw)
+		     vertex-data (or usage :static-draw))
     (cond ((not (cffi:null-pointer-p index-data))
 	   (gl:bind-buffer :element-array-buffer ebo)
 	   (%gl:buffer-data :element-array-buffer
 			    (* index-count (cffi:foreign-type-size :int))
-			    index-data :static-draw)
+			    index-data (or usage :static-draw))
 	   (cffi:foreign-free index-data))
 	  (t (gl:delete-buffers (list ebo))
 	     (setf ebo nil)))
