@@ -106,9 +106,10 @@
 
 layout (location = 0) in vec4 coord;
 out vec2 texcoord;
+uniform mat4 projection;
 
 void main(void) {
-    gl_Position = vec4(coord.xy, 0, 1);
+    gl_Position = projection * vec4(coord.xy, 0, 1);
     texcoord = coord.zw;
 }")
    (fs-source :initform "#version 150
@@ -188,7 +189,9 @@ void main(void) {
 
 (defmethod gficl-app:resize-fn ((app ft01-app) w h)
   (with-slots (shader) app
-    (gficl:bind-gl shader))
+    (gficl:bind-gl shader)
+    (gficl:bind-matrix shader "projection"
+		       (gficl:orthographic-matrix -2 2 -2 2 0 1)))
   (let ((side (min w h)))
     (gl:viewport (+ 0 (/ (- w side) 2))
 		 (+ 0 (/ (- h side) 2))
