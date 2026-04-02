@@ -47,6 +47,7 @@
    #:make-vertex-data-from-vectors
    #:make-vertex-data-from-pointers
    #:draw-vertex-data
+   #:vertex-list-to-array
 
    #:vao
    #:init-global-vao
