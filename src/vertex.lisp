@@ -243,12 +243,14 @@ must be accurate."
 
 ;;; ---- Helpers ----
 
-(declaim (ftype (function (vertex-form list) cffi:foreign-pointer) vertex-list-to-array))
-(defun vertex-list-to-array (vertex-form vertices)
+(declaim (ftype (function (vertex-form list &optional (or cffi:foreign-pointer null)) cffi:foreign-pointer) vertex-list-to-array))
+(defun vertex-list-to-array (vertex-form vertices &optional buff)
   "Create foreign memory to hold the vertex data in.
-Move vertex data vertex by vertex and check that the form matches the vertex form."
+Move vertex data vertex by vertex and check that the form matches the vertex form.
+If BUFF is supplied it should be a pointer to allocated cffi memory
+and filled with data from VERTICES instead of allocating memory"
   (let* ((vertex-count (length vertices))
-	 (buff (cffi:foreign-alloc :char :count (* (vertex-mem-size vertex-form) vertex-count)))
+	 (buff (or buff (cffi:foreign-alloc :char :count (* (vertex-mem-size vertex-form) vertex-count))))
 	 (offset 0))
     (loop for vertex in vertices do
 	  (setf offset (buffer-vertex-data vertex-form vertex buff offset)))
