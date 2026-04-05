@@ -62,7 +62,8 @@ event."
 	(ecase action
 	  (:press (pushnew k (slot-value input-state 'modifier-state)))
 	  (:release (setf (slot-value input-state 'modifier-state)
-			  (delete k (slot-value input-state 'modifier-state)))))))))
+			  (delete k (slot-value input-state 'modifier-state))))
+	  (:repeat t))))))
 
 
 (defgeneric update-key-state (state key action mod-keys)
