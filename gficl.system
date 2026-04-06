@@ -89,6 +89,8 @@
 		:components ((:file "package")
 			     (:file "base-app"
 			      :depends-on ("gficl" "types"))
+			     (:file "fbo-mixin-app"
+			      :depends-on ("base-app"))
 			     (:file "gficl"
 			      :depends-on ("input"))
 			     (:file "input"
