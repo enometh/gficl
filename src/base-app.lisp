@@ -168,14 +168,6 @@
 		      (slot-value window-options-mixin indicator))
 	append (list key val)))
 
-(defun plist-sans-keys (plist &rest keys) ; <3247672165664225@naggum.no>
-  (loop with sans for tail = (nth-value 2 (get-properties plist keys))
-	unless tail return (nreconc sans plist) do
-	(loop until (eq plist tail) do
-	      (push (pop plist) sans)
-	      (push (pop plist) sans))
-	(setq plist (cddr plist))))
-
 (defvar gficl-app:*apps* nil "List of running gficl-apps")
 
 ;; macroexpands gficl:with-window

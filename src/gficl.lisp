@@ -39,8 +39,16 @@ frame-time-var gives the seconds since last update"
        `(let ((val ,,arg))
 	  (check-type val ,',type)))))
 
+(defun plist-sans-keys (plist &rest keys) ; <3247672165664225@naggum.no>
+  (loop with sans for tail = (nth-value 2 (get-properties plist keys))
+	unless tail return (nreconc sans plist) do
+	(loop until (eq plist tail) do
+	      (push (pop plist) sans)
+	      (push (pop plist) sans))
+	(setq plist (cddr plist))))
+
 (defmacro with-window
-    ((&key
+    ((&rest rest &key
       (title "window")
       (width 500)
       (height 300)
@@ -50,7 +58,8 @@ frame-time-var gives the seconds since last update"
       (opengl-version-major 3)
       (opengl-version-minor 3)
       (resize-callback '(lambda (w h) (declare (ignore w h))))
-      (pre-window-fn '(lambda () ())))
+      (pre-window-fn '(lambda () ()))
+      &allow-other-keys)
      &body body &environment env)
   "Open a glfw window in the body of this function. 
 RESIZE-CALLBACK is only called when width and height are non-zero.
@@ -70,7 +79,11 @@ PRE-WINDOW-FN is called after glfw is initialised but before a window is created
       (glfw:with-window 
        (:title ,title :width ,width :height ,height :visible ,visible
 	       :context-version-major ,opengl-version-major
-	       :context-version-minor ,opengl-version-minor )
+	       :context-version-minor ,opengl-version-minor
+	,@(plist-sans-keys rest :title :width :height :visible :cursor
+			   :vsync :opengl-version-major
+			   :opengl-version-minor
+			   :resize-callback :pre-window-fn))
        (register-glfw-callbacks)
        (glfw:set-input-mode :cursor ,cursor)
        (glfw:swap-interval (if ,vsync 1 0))
