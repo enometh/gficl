@@ -71,6 +71,21 @@ Must be manually freed by calling DELETE-GL"
 	     (push (list (id shader) name) *shader-warnings*))))
     location))
 
+;; TMP: rename this function and implement it in terms of or via a
+;; redesigned shader-loc
+(defun shader-var (shader name)
+  "Get location of the attribute with name in the shader"
+  (let ((location (gl:get-attrib-location (id shader) name)))
+    (cond ((and (= location -1)
+		(not (find name (cdr (assoc (id shader) *shader-warnings*)))))
+	   (warn "Shader ~a ~%did not have a variable with name ~a. (The variable may not have been used)" shader name)
+	   (if (assoc (id shader) *shader-warnings*)
+	       (setf (cdr (assoc (id shader) *shader-warnings*))
+		     (cons name (cdr (assoc (id shader) *shader-warnings*))))
+	     (push (list (id shader) name) *shader-warnings*))))
+    location))
+
+
 (defun check-shader-bound (shader)
   (equalp (id shader) (gl:get-integer :current-program)))
 
