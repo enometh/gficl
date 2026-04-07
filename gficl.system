@@ -135,6 +135,7 @@
   :components ((:module "examples"
 		:components ((:file "minimum-app")
 			     (:file "minimum-app-bt")
+			     #+nil ;;madhu 260407 problems in lw,ccl
 			     (:module "extra"
 			      :components ((:file "immediate-mode-shim")))))))
 

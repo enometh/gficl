@@ -97,7 +97,7 @@ FragColor = u_color;
 
 (defmethod gficl-app:resize-fn ((app core-app) new-width new-height)
   (let ((min (min new-height new-width)))
-    (gl:viewport 0 0 min min)))
+    (cl-opengl:viewport 0 0 min min)))
 
 ;;;
 ;;; Default Util
@@ -163,8 +163,22 @@ FragColor = u_color;
 ;;; PACKAGE MUNGING
 
 ;;; the GL package. after switching the syms to either OPENGL or
-;;; GFICL-CORE-PROFILE-SHIM-SYMBOLS, all the source that uses the
+;;; GFICL-CORE-PROFILE-SHIM-SYMBOLS, all the sources that use the
 ;;; immediate mode functions must be reloaded
+
+;; ;madhu 260407 package munging does not work in lispworks. the
+;; assertion of (not (find-package "GL")) fails after deleting the
+;; nickname "GL" from "OPENGL".
+;;
+;; in clozure munge-gl-package fails during the compilation phase:
+;; after the rename package form removes the nickname "GL" from the
+;; "CL-OPENGL" package, (funcall (compile nil (lambda () (find-package
+;; "GL")))) returns the CL-OPENGL package.
+;; there a workaround is possible:
+;;    #+clozure
+;;    (when (find-package "GL")
+;;      (ccl:with-lock-grabbed (ccl::*package-refs-lock*)
+;;	(remhash "GL"  ccl::*package-refs*)))
 
 (defun munge-gl-package ()
   "initial setup. remove GL as a nickname for CL-OPENGL and make it a new
