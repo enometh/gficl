@@ -307,3 +307,10 @@ A suitable image format will be selected based on attachment position."
 	   (attachment-position obj)
 	   (attachment-type obj)
 	   (resource obj))))
+
+(export 'unbind-frame-buffer)
+(defun unbind-frame-buffer ()
+  "Undo the binding effects from make-frame-buffer"
+  (gl:bind-framebuffer :framebuffer 0)
+  (gl:bind-renderbuffer :renderbuffer 0)
+  (gl:bind-texture :texture-2d 0))
