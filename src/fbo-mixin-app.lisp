@@ -198,38 +198,49 @@ void main()
   (gficl-app:resize-fn app
 		       (gficl:window-width) (gficl:window-height)))
 
-(defmethod gficl-app:draw-fn :around ((app gficl-app:fbo-mixin))
+;; ;madhu 260407 it is retarded to introduce more method dispatch on
+;; gficl-app:draw-fn.  we already call glfw:swap-buffers in an after
+;; method on base-app (which really ought to be an around method with
+;; most-specific last dispatch so it happens at the end). instead of
+;; defining before/after or an around method on gficl-app:fbo-mixin,
+;; to do the setup and teardown of the renderbuffer around the call on
+;; the class we are wrapping, let's define a primary method which
+;; calls the next method. this implies gficl-app:fbo-mixin should
+;; never be subclassed. and it should appear first in the listing of
+;; superclasses to defclass.
+
+(defmethod gficl-app:draw-fn ((app gficl-app:fbo-mixin))
   (fbo-screen-draw-pre app)
-  (call-next-method)
+  (when (next-method-p) (call-next-method))
   (fbo-screen-draw-post app))
 
 #||
 (require 'gficl-examples-bt)
-(setq $a1 (make-instance 'gficl-examples/minimum-app::minimum-app-bt))
-(gficl-app:launch $a1)
 (defclass test (gficl-app:fbo-mixin gficl-examples/minimum-app::minimum-app-bt)
   ())
-(setq $a2 (make-instance 'test))
-(user::undefmethod gficl-app:setup-fn :after((app test))
-  (with-slots (test-texture) app
-    (setq test-texture (gficl/load/image-imlib2:image-imlib2
-			"/home/madhu/inbox/images/965.jpg"))))
+(setq $a1 (make-instance 'test))
+(gficl-app:launch $a1)
+(gficl-app:in-thread-sync $a1
+  (with-slots (test-texture) $a1
+    (setq test-texture
+	  nil #+nil
+	  (gficl/load/image-imlib2:image-imlib2
+	   "/home/madhu/inbox/images/965.jpg"))))
+(trace gficl-app:draw-fn :methods t)
+(untrace)
+(setq $a2 (make-instance 'test :disable-draw-fn t))
 (gficl-app:launch $a2)
-(setf (slot-value $a2 'gficl-app:use-fbo) nil)
 (setf (slot-value $a2 'gficl-app:use-fbo) t)
-(setq $a3 (make-instance 'test :disable-draw-fn t))
-(gficl-app:launch $a3)
-(setf (slot-value $a3 'gficl-app:use-fbo) nil)
-(gficl-app:in-thread $a3
-  (glfw:swap-buffers))
-(gficl-app:in-thread-sync $a3
-  (gl:clear-color 1 1 1  1)
+(setf (slot-value $a2 'gficl-app:use-fbo) nil)
+(gficl-app:in-thread $a2  (glfw:swap-buffers))
+(gficl-app:in-thread-sync $a2
+  (gl:clear-color 1 1 0  1)
   (gl:clear :color-buffer-bit)
   (glfw:swap-buffers))
-(gficl-app:in-thread-sync $a3
-  (gficl:bind-gl (slot-value $a3 'gficl-examples/minimum-app::shader-program))
+(gficl-app:in-thread-sync $a2
+  (gficl:bind-gl (slot-value $a2 'gficl-examples/minimum-app::shader-program))
   (gl:clear :color-buffer-bit)
   (gficl:draw-vertex-data
-    (slot-value $a3 'gficl-examples/minimum-app::vertex-data))
+    (slot-value $a2 'gficl-examples/minimum-app::vertex-data))
     (glfw:swap-buffers))
 ||#
