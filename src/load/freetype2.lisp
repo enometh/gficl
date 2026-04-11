@@ -169,7 +169,10 @@
 
 ||#
 
-(defclass ft01-app (gficl-app:base-app-bt)
+(eval-when (load eval compile)
+  (export '(gficl-app::ft2-mixin-app) :gficl-app))
+
+(defclass  gficl-app:ft2-mixin-app ()
   ((vs-source :initform "#version 330
 
 layout (location = 0) in vec4 coord;
@@ -180,7 +183,7 @@ void main(void) {
     gl_Position = projection * vec4(coord.xy, 0, 1);
     texcoord = coord.zw;
 }")
-   (fs-source :initform "#version 150
+   (fs-source :initform "#version 330
 
 in vec2 texcoord;
 uniform sampler2D tex;
@@ -196,28 +199,27 @@ void main(void) {
    (fmap :initform (make-hash-table :test #'equal))
    (buff :initform nil)
    (buflen :initform nil)
-   (vertices :initform (xcomp2 '(((-1.0 -1.0))
-				 ((1.0 -1.0))
-				 ((1.0 1.0))
-				 ((-1.0 1.0)))
-			       '(((0.0 0.0))
-				 ((1.0 0.0))
-				 ((1.0 1.0))
-				 ((0.0 1.0)))))
+   (vertices :initform (flet ((xcomp2 (a b)
+				(mapcar (lambda (a b)
+					  (list(append (car a) (car b))))
+					a b)))
+			 (xcomp2 '(((-1.0 -1.0))
+				   ((1.0 -1.0))
+				   ((1.0 1.0))
+				   ((-1.0 1.0)))
+				 '(((0.0 0.0))
+				   ((1.0 0.0))
+				   ((1.0 1.0))
+				   ((0.0 1.0))))))
    (indices :initform  '(0 3 2 2 1 0))
    (vertex-form :initform
 		(gficl:make-vertex-form
-		 (list (gficl:make-vertex-slot 4 :float)))))
-  (:default-initargs
-   :opengl-debug-context t
-   :title "font rendering"))
+		 (list (gficl:make-vertex-slot 4 :float))))))
 
-(defmethod gficl-app:cleanup-fn ((app ft01-app))
-  (with-slots (tex vertex-data shader fmap buff buflen)
+(defun ft2-app-cleanup (app)
+  (check-type app gficl-app:ft2-mixin-app)
+  (with-slots (vertex-data shader fmap buff buflen)
       app
-    (when tex
-      (gficl:delete-gl tex)
-      (setq tex nil))
     (when shader
       (gficl:delete-gl shader)
       (setq shader nil))
@@ -237,12 +239,13 @@ void main(void) {
 	       fmap)
       (clrhash fmap))))
 
-(defmethod gficl-app:setup-fn ((app ft01-app))
+(defun ft2-app-setup (app)
+  (check-type app gficl-app:ft2-mixin-app)
   (gl:clear-color 0.5 0.7 0.8 0)
   ;;Enable blending, necessary for our alpha texture
   (gl:enable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
-  (with-slots (tex vertex-data shader vs-source fs-source
+  (with-slots (vertex-data shader vs-source fs-source
 	       buff vertex-form vertices indices
 	       buflen)
       app
@@ -254,28 +257,29 @@ void main(void) {
 		    (gficl::vertex-mem-size vertex-form)))
     (setq buff (gficl::vertex-list-to-array
 		vertex-form
-		vertices)))
-  (gficl-app:resize-fn app
-		       (gficl:window-width) (gficl:window-height)))
+		vertices))
+    (gficl:bind-gl shader)
+    (let ((loc (gficl:shader-loc shader "tex")))
+      (when (/= loc -1)
+	(gl:active-texture :texture0)
+	(gl:uniformi loc 0)))))
 
-(defvar *drawing-mode* :text); or ;char
-
-(defmethod gficl-app:resize-fn ((app ft01-app) w h)
+(defun ft2-app-init (app w h)
+  (check-type app gficl-app:ft2-mixin-app)
   (with-slots (shader) app
     (gficl:bind-gl shader)
     (gficl:bind-matrix shader "projection"
 		       (gficl:screen-orthographic-matrix w h))
     (gficl:bind-vec shader "color"
-		    (gficl:make-vec '(1 1 1 1))))
-    (gl:viewport 0 0 w h))
+		    (gficl:make-vec '(1 1 1 1)))))
 
-(defmethod gficl-app:update-fn ((app ft01-app))
-  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
-
-(defun render-char (app char &key (xpos 0) (ypos 0) (scale 1))
-  (with-slots (buff vertex-data buflen vertex-form fmap) app
+(defun ft2-app-render-char (app char &key (xpos 0) (ypos 0) (scale 1))
+  (check-type app gficl-app:ft2-mixin-app)
+  (with-slots (buff vertex-data buflen vertex-form fmap shader) app
     (let ((c (intern-char-rec char fmap)))
       (assert c)
+      (gficl:bind-gl shader)
+      (gl:active-texture :texture0)
       (when (char-rec-texture-id c)
 	(gl:bind-texture :texture-2d (gficl:id (char-rec-texture-id c))))
       (let ((h (char-rec-h c))
@@ -305,9 +309,10 @@ void main(void) {
 	 buff)
 	(gficl::send vertex-data buff 0 buflen)))))
 
-
-(defun render-text (app text &key (xpos 0) (ypos 0) (scale 1))
-  (with-slots (buff vertex-data buflen vertex-form fmap) app
+(defun ft2-app-render-text (app text &key (xpos 0) (ypos 0) (scale 1))
+  (check-type app gficl-app:ft2-mixin-app)
+  (with-slots (buff vertex-data buflen vertex-form fmap shader) app
+    (gficl:bind-gl shader)
     (loop for char across text
 	  for c = (intern-char-rec char fmap)
 	  for h = (* (char-rec-h c) scale)
@@ -317,6 +322,7 @@ void main(void) {
 			   (char-rec-bearing-y c)
 			   scale))
 	  do
+	  (gl:active-texture :texture0)
 	  (when (char-rec-texture-id c)
 	    (gl:bind-texture :texture-2d (gficl:id (char-rec-texture-id c))))
 	  (gficl::vertex-list-to-array
@@ -340,14 +346,51 @@ void main(void) {
 	  (gficl:draw-vertex-data vertex-data)
 	  (incf xpos (* scale (char-rec-advance-x c))))))
 
+
+
+;;; ----------------------------------------------------------------------
+;;;
+;;;
+;;; Example
+
+(defclass ft01-app (gficl-app:ft2-mixin-app gficl-app:base-app-bt)
+  ((tex :initform nil))
+  (:default-initargs
+   :opengl-debug-context t
+   :title "font rendering"))
+
+(defmethod gficl-app:cleanup-fn ((app ft01-app))
+  (ft2-app-cleanup app)
+  (with-slots (tex) app
+    (when tex
+      (gficl:delete-gl tex)
+      (setq tex nil))))
+
+(defmethod gficl-app:setup-fn ((app ft01-app))
+  (ft2-app-setup app)
+  (gficl-app:resize-fn app
+		       (gficl:window-width) (gficl:window-height)))
+
+(defmethod gficl-app:resize-fn ((app ft01-app) w h)
+  (with-slots (shader) app
+    (gficl:bind-gl shader)
+    (ft2-app-init app w h)
+    (gl:viewport 0 0 w h)))
+
+(defmethod gficl-app:update-fn ((app ft01-app))
+  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
+
+
+(defvar *drawing-mode* :text); or ;char
+
 (defun draw-some-text (app)
   (gl:clear :color-buffer)
   (with-slots (vertex-data) app
     (ecase *drawing-mode*
-      (:text(render-text app "the quick brown fox" :ypos 100 :xpos 30 :scale .5)
-       (render-text app "jumped over the" :ypos 150 :xpos 30 :scale 1)
-       (render-text app "lazy dog" :ypos 200 :xpos 30 :scale 1)
-       (render-text app (format nil "location ~S" (gficl:mouse-pos))
+      (:text (ft2-app-render-text app "the quick brown fox" :ypos 100 :xpos 30 :scale .5)
+       (ft2-app-render-text app "jumped over the" :ypos 150 :xpos 30 :scale 1)
+       (ft2-app-render-text app "lazy dog" :ypos 200 :xpos 30 :scale 1)
+       (ft2-app-render-text app (format nil "location ~S" (gficl:mouse-pos))
 		    :ypos 250 :xpos 30 :scale .5))
       (:char
        (when vertex-data
@@ -360,9 +403,7 @@ void main(void) {
 (setq $app (make-instance 'ft01-app))
 (gficl-app:launch $app)
 (setq *drawing-mode* :char)
-(gficl-app:in-thread-sync $app
-  (render-char $app #\h :xpos  0 :ypos  0))
 (setq *drawing-mode* :text)
 (gficl-app:in-thread-sync $app
-  (render-text $app "foo bar 1234" :xpos  100 :ypos  200))
+  (render-char $app #\h :xpos  0 :ypos  0))
 ||#
