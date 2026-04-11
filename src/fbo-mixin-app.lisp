@@ -161,7 +161,7 @@ void main()
 	     (gl:bind-renderbuffer :renderbuffer 0)
 	     (gl:bind-texture :texture-2d 0)))))
 
-(defun fbo-screen-draw-post (app)
+(defun fbo-screen-draw-post (app &key (draw t))
   "now bind back to default framebuffer and draw a quad plane with the attached framebuffer color texture"
   (check-type app gficl-app:fbo-mixin)
   (with-slots (gficl-app:use-fbo screen-fbo screen-vertex-data screen-shader
@@ -171,16 +171,17 @@ void main()
       (gl:bind-framebuffer :framebuffer 0)
       (gl:bind-renderbuffer :renderbuffer 0)
       (gl:bind-texture :texture-2d 0)
-      ;; (gl:disable :depth-test)
-      (gl:clear :color-buffer)
-      ;; (gl:clear-color 1 1 1 1)
-      (gl:clear :color-buffer-bit :depth-buffer-bit)
-      (gficl:bind-gl screen-shader)
-      (if test-texture
-	  (gficl:bind-gl test-texture)
-	  (gl:bind-texture :texture-2d
-			   (gficl:framebuffer-texture-id screen-fbo 0)))
-      (gficl:draw-vertex-data screen-vertex-data))))
+      (when draw
+	;; (gl:disable :depth-test)
+	(gl:clear :color-buffer)
+	;; (gl:clear-color 1 1 1 1)
+	(gl:clear :color-buffer-bit :depth-buffer-bit)
+	(gficl:bind-gl screen-shader)
+	(if test-texture
+	    (gficl:bind-gl test-texture)
+	    (gl:bind-texture :texture-2d
+			     (gficl:framebuffer-texture-id screen-fbo 0)))
+	(gficl:draw-vertex-data screen-vertex-data)))))
 
 (defmethod gficl-app:cleanup-fn :after ((app gficl-app:fbo-mixin))
   (fbo-screen-cleanup app))
