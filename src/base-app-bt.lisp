@@ -32,7 +32,9 @@
 	    "IN-THREAD"
 	    "RESTART-PIPELINE"
 	    "SHUTDOWN"
-	    "BASE-APP-BT")))
+	    "BASE-APP-BT"
+	    "REPLACE-AND-RELOAD"
+	    "SKELETON")))
 
 (defclass gficl-app:threaded-executor-mixin ()
   ((main-thread :initform nil)
@@ -138,3 +140,101 @@
 
 (defmacro gficl-app:in-thread-sync (app &body body)
   `(gficl-app:call-in-thread-sync ,app (lambda () ,@body))))
+
+
+
+;;; ----------------------------------------------------------------------
+;;;
+;;; EXTRAS
+;;;
+
+(defun gficl-app:replace-and-reload (app &rest slots)
+  "Hack. after changing SLOTS in the class definition of APP's class,
+push these into a running instance of APP."
+  (flet ((replace-slots (app &rest slots)
+	   (let ((new (make-instance (class-name (class-of app)))))
+	     (dolist (slot slots)
+	       (setf (slot-value app slot)
+		     (slot-value new slot))))))
+    (apply #'replace-slots app slots)
+    (gficl-app:restart-pipeline app)))
+
+(defpackage "GFICL-SKELETON" (:use "CL"))
+(in-package "GFICL-SKELETON")
+
+(defun gficl-app:skeleton (class-name file)
+  "dump skeleton code for CLASS-NAME in FILE"
+  (let* ((pkg (concatenate 'string "GFICL-EXAMPLE-APP/" (string class-name)))
+	 (lname (string-downcase (string class-name)))
+	 (forms
+	  `(progn
+	     ";;; -*- Mode: LISP; Package: :cl-user; BASE: 10; Syntax: ANSI-Common-Lisp; -*-"
+	     (defpackage ,pkg (:use "CL"))
+	     (in-package ,pkg)
+	     (defclass ,class-name (gficl-app:base-app-bt)
+	       ((vs-source :initform "#version 330
+layout (location = 0) in vec2 coord;
+layout (location = 1) in vec2 texcoord;
+void main () { gl_Position = vec4(coord.xy,0,1); }
+")
+		(fs-source :initform "#version 330
+void main() { gl_FragColor = vec4(0, .7, .7, 1); }")
+		(shader :initform nil)
+		(vertex-data :initform nil))
+	       (:default-initargs
+		:title ,lname
+		:opengl-debug-context t
+		:context-version-major 4
+		:context-version-minor 3))
+	     (defmethod gficl-app:cleanup-fn ((app ,class-name))
+	       (with-slots (shader vertex-data) app
+		 (when vertex-data
+		   (gficl:delete-gl vertex-data)
+		   (setq vertex-data nil))
+		 (when shader
+		   (gficl:delete-gl shader)
+		   (setq shader nil))))
+	     (defmethod gficl-app:setup-fn ((app ,class-name))
+	       (with-slots (shader vertex-data vs-source fs-source) app
+		 (when (and vs-source fs-source)
+		   (with-simple-restart (cont "Cont")
+		     (setq shader (gficl:make-shader vs-source fs-source))))
+		 (setq vertex-data
+		       (gficl:make-vertex-data
+			(gficl:make-vertex-form
+			 (list (gficl:make-vertex-slot 2 :float :vertex-slot-index 0)
+			       (gficl:make-vertex-slot 2 :float :vertex-slot-index 1)))
+			`(((-1.0 -1.0) (0.0 0.0))
+			  ((1.0 -1.0) (1.0 0.0))
+			  ((1.0 1.0) (1.0 1.0))
+			  ((-1.0 1.0) (0.0 1.0)))
+			'(0 3 2 2 1 0)))))
+	     (defmethod gficl-app:resize-fn ((app ,class-name) w h)
+	       (with-slots (shader) app
+		 (gficl:bind-gl shader))
+	       (gl:viewport 0 0 w h))
+	     (defmethod gficl-app:update-fn ((app ,class-name))
+	       (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
+	     (defmethod gficl-app:draw-fn ((app ,class-name))
+	       (with-slots (vertex-data shader) app
+		 (gficl:bind-gl shader)
+		 (gficl:draw-vertex-data vertex-data)))
+	     ,(format nil "\#\|\|
+(setq $t1 (make-instance '~A))
+(gficl-app:launch $t1)
+\|\|\#"
+		      class-name))))
+    (let ((*print-case* :downcase)
+	  (*package* (find-package "GFICL-SKELETON")))
+      (assert (eql (car forms) 'progn))
+      (with-open-file (stream file :direction :output :if-exists :supersede)
+	(loop for i from 0 for (form . rest) on (cdr forms)
+	      do (if (stringp form)
+		     (format stream "~A~&" form)
+		     (format stream "~S~&" form))
+	      unless (or (< i 2) (endp rest))
+	      do (terpri stream))))))
+(in-package "GFICL")
+
+#+nil
+(skeleton 'foo "/dev/shm/1.l")
