@@ -97,6 +97,7 @@
    #:+vec
    #:-vec
    #:*vec
+   #:vec*
    #:magnitude
    #:normalise
    #:cross

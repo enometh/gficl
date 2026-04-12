@@ -80,6 +80,12 @@
   "multiply a vector by a number"
   (make-vec (loop for x across (slot-value vec 'data) collecting (* scalar x))))
 
+(defun vec* (vec vec1)
+  "multiply a vector with a vector"
+  (make-vec (loop for x across (slot-value vec 'data)
+		  for y across (slot-value vec1 'data)
+		  collecting (* x y))))
+
 (declaim (ftype (function (vec &rest vec) (values vec &optional)) internal-+vec))
 (defun internal-+vec (vec &rest vecs)
   (if (not (car vecs)) vec
