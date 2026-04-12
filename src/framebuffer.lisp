@@ -147,6 +147,18 @@ Will signal an error if the index is out of range, or if the attachment at that 
 	(id (resource (car attach)))
       (error "Tried to get the attachment id of a non texture attachment"))))
 
+(defun framebuffer-texture (framebuffer index)
+  "Return the texture of the framebuffer attachment at index INDEX.
+Will signal an error if the index is out of range, or if the attachment at that index is not a texture attachment."
+  (let ((attach (attachments framebuffer)))
+    (dotimes (i index)
+      (if (or (equalp attach nil) (equalp (cdr attach) nil))
+	  (error "Framebuffer attachment index was greater than the number of attachments"))
+      (setf attach (cdr attach)))
+    (if (equalp (attachment-type (car attach)) :texture)
+	(resource (car attach))
+      (error "Tried to get the attachment id of a non texture attachment"))))
+
 (declaim (ftype (function (framebuffer framebuffer attachment-position))
 		framebuffer-add-external-attachment))
 (defun framebuffer-add-external-attachment (target-fb src-fb pos)
