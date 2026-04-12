@@ -120,7 +120,7 @@ void main()
       (gficl:delete-gl screen-fbo)
       (setq screen-fbo nil))))
 
-(defun fbo-screen-maybe-init-fbo (app w h)
+(defun fbo-screen-maybe-init-fbo (app w h &optional (tex-format :rgba))
   (check-type app gficl-app:fbo-mixin)
   (with-slots (screen-fbo fbo-initialized-p) app
     (unless (and screen-fbo
@@ -130,6 +130,7 @@ void main()
 	(gficl:delete-gl screen-fbo))
       (setq screen-fbo (gficl:make-framebuffer
 			(list (gficl:make-attachment-description
+			       :internal-format tex-format
 			       :type :texture)
 			      (gficl:make-attachment-description
 			       :position :depth-stencil-attachment
