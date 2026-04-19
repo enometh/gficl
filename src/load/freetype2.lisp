@@ -13,7 +13,9 @@
 
 #||
 (load "/home/madhu/cl/extern/claw-cxx-ft/claw-cxx-ft.bindings.system")
-(require 'claw-cxx-ft.bindings)
+(mk:oos :cffi-object.ops :load)
+(mk:oos :claw-cxx-ft.bindings :load)
+(mk:oos :claw-cxx-fc.bindings :load)
 #+nil
 (cffi:foreign-symbol-pointer "FT_Init_FreeType")
 ||#
@@ -21,74 +23,177 @@
 (unless (cffi:find-foreign-library "freetype")
   (cffi:load-foreign-library "libfreetype.so"))
 
-;; use global instance of FT library and faces do thread safety stuff
-;; later.
-
-(defvar $ft nil "FT_library CFFI Object")
-(defvar $ft-face nil "FT_Face CFFI Object")
-(defvar $g nil "FT_GlyphSlot Object: = face->glyph")
-
-(defvar $font-file-ft-face-map (make-hash-table :test #'equal))
+(unless (cffi:find-foreign-library "fontconfig")
+  (cffi:load-foreign-library "libfontconfig.so"))
 
 (eval-when (load eval compile)
   (user::package-add-nicknames "CLAW-CXX-FT" "FT2"))
 
-(defun close-ft ()
-  (when $ft-face
-    (with-simple-restart (cont "Cont")
-      (ft2:done-face $ft-face))
-    (setq $ft-face nil))
-  (when $ft
-    (with-simple-restart (cont "Cont")
-      (ft2:done-free-type $ft))
-    (setq $ft nil)))
+(defclass face-rec ()
+  ((face :initform nil :documentation "FT_Face CFFI Object")
+   (g :initform nil :documentation "FT_Glyph CFFI Object" )
+   (size :initform nil)))
 
-(defun init-ft (font)
-  (declare (notinline ft2:new-face ft2:set-pixel-sizes))
-  ;; cannot inline these functions because there no applicable methods
-  ;; for cobj::funcall-dynamic-extent-form with args (cobj:wrap-lvalue
-  ;; ft-face). also see load-char.
-  (assert (not $ft) nil "please (close-ft) before init-ft")
-  (setq $ft (cobj:cobject-new 'ft2:library))
-  (unless (zerop (ft2:init-free-type $ft))
-    (error "could not init freetype library"))
-  (assert (not $ft-face))
-  (setq $ft-face (cobj:cobject-new 'ft2:face))
-  (unless (zerop (ft2:new-face
-		  (cobj:wrap-lvalue $ft)
-		  font
-		  0
-		  $ft-face))
-    (error "could not open font ~A" font))
-  (setq $g (ft2:face-rec-glyph
-	    (cobj:wrap-lvalue $ft-face 'ft2:face-rec)))
-  (ft2:set-pixel-sizes (cobj:wrap-lvalue $ft-face) 0 48))
+(defun close-face-rec (face-rec)
+  (with-slots (face g) face-rec
+    (when face
+      (with-simple-restart (cont "Cont")
+	(ft2:done-face face)
+	(setq face nil)))
+    (when g
+      (setq g nil))))
 
-(defun load-char (ft-face char)
-  (declare (notinline ft2:load-char))
-  (unless (zerop (ft2:load-char (cobj:wrap-lvalue ft-face)
-				(etypecase char
-				  (number char)
-				  (character (char-code char)))
-				ft2:+LOAD-RENDER+))
-      (error "Could not load character ~C" char)))
+(defun init-face-rec (ft face-rec size truename)
+  ;;(declare (notinline ft2:new-face))
+  (with-slots (face g (sz size)) face-rec
+    (assert (every #'null (list face g)))
+    (setq face (cobj:cobject-new 'ft2:face))
+    (unless (zerop (ft2:new-face
+		    (cobj:wrap-lvalue ft)
+		    (namestring truename)
+		    0
+			  face))
+      (error "could not open font ~A" truename))
+    (setq g (ft2:face-rec-glyph
+	     (cobj:wrap-lvalue face 'ft2:face-rec)))
+    (setq sz size)
+    (ft2:set-pixel-sizes (cobj:wrap-lvalue face) 0 size)))
 
-(defun make-tex-for-char ()
-  "make a texture for the currently loaded char"
-  ;; (gl:pixel-store :unpack-alignment 1) set for format :red
-  (let ((w (ft2:bitmap-width (ft2:glyph-slot-rec-bitmap $g)))
-	(h (ft2:bitmap-rows (ft2:glyph-slot-rec-bitmap $g))))
-    (when (and (> w  0) (> h 0))
-      (gficl:make-texture w
-			  h
-			  :format :red
-			  :internal-format :red
-			  :data
-			  (cobj:cobject-pointer (ft2:bitmap-buffer
-						 (ft2:glyph-slot-rec-bitmap $g)))
-			  :filter :nearest
-			  :wrap :clamp-to-edge
-			  :format :red))))
+(defclass font-man ()
+  ((ft :initform nil :documentation "FT_library CFFI Object" :allocation :class)
+   (path-to-face-map :initform     ;; actually path-to-faces map
+		     (make-hash-table :test #'equal) :allocation :class)))
+
+(defun close-font-man (font-man)
+  (with-slots (ft path-to-face-map) font-man
+    (maphash (lambda (path face-recs)
+	       (declare (ignore path))
+	       (dolist (face-rec face-recs)
+		 (close-face-rec face-rec)))
+	     path-to-face-map)
+    (clrhash path-to-face-map)
+    (when ft
+      (with-simple-restart (cont "Cont")
+	(ft2:done-free-type ft))
+      (setq ft nil))))
+
+(defun init-font-man (font-man)
+  (with-slots (ft) font-man
+    (unless ft
+      (setq ft (cobj:cobject-new 'ft2:library))
+      (unless (zerop (ft2:init-free-type ft))
+	(error "could not init freetype library")))))
+
+(defun find-create-face (font-man font-file size)
+  "Returns a face-rec object. Second return value is non-NIL if
+the face-rec was freshely created."
+  ;;(declare (notinline ft2:new-face))
+  (with-slots (ft path-to-face-map) font-man
+    (let* ((truename (truename font-file))
+	   (elts (gethash truename path-to-face-map)))
+      (when elts
+	(loop for elt in elts
+	      if (= (slot-value elt 'size) size)
+	      do (return-from find-create-face elt)))
+      (let ((rec (make-instance 'face-rec)))
+	(init-face-rec ft rec size truename)
+	(push rec elts)
+	(setf (gethash truename path-to-face-map) elts)
+	(values rec t)))))
+
+(defun face-load-char (face-rec char)
+  ;;(declare (notinline ft2:load-char))
+  (with-slots (face) face-rec
+    (unless (zerop (ft2:load-char (cobj:wrap-lvalue face)
+				  (etypecase char
+				    (number char)
+				    (character (char-code char)))
+				  ft2:+LOAD-RENDER+))
+      (error "Could not load character ~C" char))))
+
+(defun face-get-metrics (face-rec)
+  (with-slots (g) face-rec
+    (list :h (ft2:bitmap-rows (ft2:glyph-slot-rec-bitmap g))
+	  :w (ft2:bitmap-width (ft2:glyph-slot-rec-bitmap g))
+	  :bearing-x (ft2:glyph-slot-rec-bitmap-left g)
+	  :bearing-y (ft2:glyph-slot-rec-bitmap-top g)
+	  :advance-x
+	  (ash (ft2:vector-x (ft2:glyph-slot-rec-advance g)) -6)
+	  :advance-y
+	  (ash (ft2:vector-y (ft2:glyph-slot-rec-advance g)) -6)
+	  )))
+
+(defvar $fm (let ((fm (make-instance 'font-man)))
+	      (init-font-man fm)
+	      fm))
+#||
+(close-font-man $fm);segfaults ccl
+(setq $face (find-create-face
+	     $fm
+	     "/home/madhu/cl/extern/Github/gficl/examples/assets/Roboto-Regular.ttf"
+	     48))
+(face-load-char $face #\x)
+(face-get-metrics $face)
+(with-slots (g) $face
+  (list (ft2:bitmap-width (ft2:glyph-slot-rec-bitmap g))
+	(ft2:bitmap-rows (ft2:glyph-slot-rec-bitmap g))))
+(face-load-char $face #\h)
+(face-get-metrics $face)
+||#
+
+(defvar *fconfig* nil)
+
+(defun finish-config ()
+  (when *fconfig*
+    (claw-cxx-fc:%fc-config-destroy *fconfig*)
+    (setq *fconfig* nil)))
+
+(defun find-config ()
+  (or *fconfig*
+      (setq *fconfig* (claw-cxx-fc:%fc-init-load-config-and-fonts))))
+
+(defun match-description (desc)
+  (cffi:with-foreign-string (string desc :encoding :utf-8)
+    (cffi:with-foreign-objects ((result 'claw-cxx-fc:fc-result)
+				(value 'claw-cxx-fc:fc-value))
+      (let ((pattern (claw-cxx-fc:%fc-name-parse string))
+	    (config (find-config)))
+	(claw-cxx-fc:%fc-config-substitute config pattern :fc-match-pattern)
+	(claw-cxx-fc:%fc-default-substitute pattern)
+	(let ((match (claw-cxx-fc:%fc-font-match config pattern result)))
+	  (unless (eql (cffi:mem-ref result 'claw-cxx-fc:fc-result) :fc-result-match)
+	    (error "fontconfig failed to find match for ~S" string))
+	  (unless (eql (claw-cxx-fc:%fc-pattern-get match
+						    claw-cxx-fc:+FC-FILE+ 0 value)
+		       :fc-result-match)
+	    (error "fontconfig failed to find match for ~S" string))))
+      (cffi:foreign-string-to-lisp
+       (cffi:foreign-slot-value
+	(cffi:foreign-slot-pointer value 'claw-cxx-fc:fc-value 'claw-cxx-fc:u)
+	'(:union claw-cxx-fc:c\:@s@-fc-value@u@fontconfig.h@10286)
+	'claw-cxx-fc:s)
+       :encoding :utf-8))))
+
+#+nil
+(time (match-description "Noto Serif Devanagari"))
+
+(defun make-tex-for-char (face-rec)
+  (with-slots (g) face-rec
+    "make a texture for the currently loaded char"
+    ;; (gl:pixel-store :unpack-alignment 1) set for format :red
+    (let ((w (ft2:bitmap-width (ft2:glyph-slot-rec-bitmap g)))
+	  (h (ft2:bitmap-rows (ft2:glyph-slot-rec-bitmap g))))
+      (when (and (> w  0) (> h 0))
+	(gficl:make-texture w
+			    h
+			    :format :red
+			    :internal-format :red
+			    :data
+			    (cobj:cobject-pointer (ft2:bitmap-buffer
+						   (ft2:glyph-slot-rec-bitmap g)))
+			    :filter :nearest
+			    :wrap :clamp-to-edge
+			    :format :red)))))
 
 ;; turns out to be identical to fude-gl glyph
 (defstruct char-rec
@@ -99,43 +204,46 @@
   advance-x
   advance-y
   ;; offset to advance to next glyph in (1/64th of a pixel)
+  size
   )
 
-(defun intern-char-rec (c map &key force omit-texture)
-  (multiple-value-bind (rec foundp)
-      (gethash c map)
-    (cond ((and foundp (not force)) rec)
-	  (t (load-char $ft-face c)
-	     (let ((rec
-		    (make-char-rec
-		     :char c
-		     :texture-id (unless omit-texture
-				   (make-tex-for-char))
-		     :h (ft2:bitmap-rows (ft2:glyph-slot-rec-bitmap $g))
-		     :w (ft2:bitmap-width (ft2:glyph-slot-rec-bitmap $g))
-		     :bearing-x (ft2:glyph-slot-rec-bitmap-left $g)
-		     :bearing-y (ft2:glyph-slot-rec-bitmap-top $g)
-		     :advance-x
-		     (ash (ft2:vector-x (ft2:glyph-slot-rec-advance $g)) -6)
-		     :advance-y
-		     (ash (ft2:vector-y (ft2:glyph-slot-rec-advance $g)) -6)
-		     )))
-	       (setf (gethash c map) rec)
+(defun intern-char-rec (face-rec c map &key force omit-texture &aux rec)
+  (with-slots (g size) face-rec
+    (multiple-value-bind (recs foundp)
+	(gethash c map)
+      (when foundp
+	(loop for elt in recs
+	      if (= (slot-value elt 'size)
+		    (slot-value face-rec 'size))
+	      return (setq rec elt)))
+      (cond ((and rec (not force)) rec)
+	    (t (when (and rec force)
+		 (let ((id (char-rec-texture-id rec)))
+		   (when id (gficl:delete-gl id))))
+	       (face-load-char face-rec c)
+	       (setq rec
+		     (make-char-rec
+		      :char c
+		      :texture-id (unless omit-texture
+				    (make-tex-for-char face-rec))
+		      :h (ft2:bitmap-rows (ft2:glyph-slot-rec-bitmap g))
+		      :w (ft2:bitmap-width (ft2:glyph-slot-rec-bitmap g))
+		      :bearing-x (ft2:glyph-slot-rec-bitmap-left g)
+		      :bearing-y (ft2:glyph-slot-rec-bitmap-top g)
+		      :advance-x
+		      (ash (ft2:vector-x (ft2:glyph-slot-rec-advance g)) -6)
+		      :advance-y
+		      (ash (ft2:vector-y (ft2:glyph-slot-rec-advance g)) -6)
+		      :size size
+		      ))
+	       (push rec recs)
+	       (setf (gethash c map) recs)
 	       rec)))))
 
-
-#+nil
-(close-ft)
-
-;;#+nil
-(unless $ft
-  (init-ft
-   "/home/madhu/cl/extern/Github/gficl/examples/assets/Roboto-Regular.ttf"))
-
-(defun text-extent (text fmap scale)
+(defun text-extent (face-rec text fmap scale)
   (let ((xpos 0) (max-h -1))
     (loop for char across text
-	  for c = (intern-char-rec char fmap)
+	  for c = (intern-char-rec face-rec char fmap)
 	  for h = (* (char-rec-h c) scale)
 	  for w = (* (char-rec-w c) scale)
 	  do (setq max-h (max h max-h))
@@ -144,7 +252,7 @@
 
 #||
 (setq $h (make-hash-table))
-(text-extent "the quick brown fox" $h 1)
+(text-extent $face "the quick brown fox" $h 1)
 ||#
 
 
@@ -232,16 +340,18 @@ void main(void) {
     (when buflen
       (setq buflen nil))
     (when fmap
-      (maphash (lambda (k v)
+      (maphash (lambda (k vs)
 		 (declare (ignore k))
-		 (when  (char-rec-texture-id v)
-		   (gficl:delete-gl (char-rec-texture-id v))))
+		 (dolist (v vs)
+		   (when  (char-rec-texture-id v)
+		     (gficl:delete-gl (char-rec-texture-id v)))))
 	       fmap)
       (clrhash fmap))))
 
 (defun ft2-app-setup (app)
   (check-type app gficl-app:ft2-mixin-app)
   (gl:clear-color 0.5 0.7 0.8 0)
+  ;;(gl:clear-color 1 1 1 0)
   ;;Enable blending, necessary for our alpha texture
   (gl:enable :blend)
   (gl:blend-func :src-alpha :one-minus-src-alpha)
@@ -273,10 +383,10 @@ void main(void) {
     (gficl:bind-vec shader "color"
 		    (gficl:make-vec '(1 1 1 1)))))
 
-(defun ft2-app-render-char (app char &key (xpos 0) (ypos 0) (scale 1))
+(defun ft2-app-render-char (app face-rec char &key (xpos 0) (ypos 0) (scale 1))
   (check-type app gficl-app:ft2-mixin-app)
   (with-slots (buff vertex-data buflen vertex-form fmap shader) app
-    (let ((c (intern-char-rec char fmap)))
+    (let* ((c (intern-char-rec face-rec char fmap)))
       (assert c)
       (gficl:bind-gl shader)
       (gl:active-texture :texture0)
@@ -309,12 +419,12 @@ void main(void) {
 	 buff)
 	(gficl::send vertex-data buff 0 buflen)))))
 
-(defun ft2-app-render-text (app text &key (xpos 0) (ypos 0) (scale 1))
+(defun ft2-app-render-text (app face-rec text &key (xpos 0) (ypos 0) (scale 1))
   (check-type app gficl-app:ft2-mixin-app)
   (with-slots (buff vertex-data buflen vertex-form fmap shader) app
     (gficl:bind-gl shader)
     (loop for char across text
-	  for c = (intern-char-rec char fmap)
+	  for c = (intern-char-rec face-rec char fmap)
 	  for h = (* (char-rec-h c) scale)
 	  for w = (* (char-rec-w c) scale)
 	  for x = (+ xpos (* (char-rec-bearing-x c) scale))
@@ -383,27 +493,41 @@ void main(void) {
 
 (defvar *drawing-mode* :text); or ;char
 
-(defun draw-some-text (app)
+(defun draw-some-text (app face-rec)
   (gl:clear :color-buffer)
   (with-slots (vertex-data) app
     (ecase *drawing-mode*
-      (:text (ft2-app-render-text app "the quick brown fox" :ypos 100 :xpos 30 :scale .5)
-       (ft2-app-render-text app "jumped over the" :ypos 150 :xpos 30 :scale 1)
-       (ft2-app-render-text app "lazy dog" :ypos 200 :xpos 30 :scale 1)
-       (ft2-app-render-text app (format nil "location ~S" (gficl:mouse-pos))
+      (:text (ft2-app-render-text app face-rec "the quick brown fox" :ypos 100 :xpos 30 :scale .5)
+       (ft2-app-render-text app face-rec "jumped over the" :ypos 150 :xpos 30 :scale 1)
+       (ft2-app-render-text app face-rec "lazy dog" :ypos 200 :xpos 30 :scale 1)
+       (ft2-app-render-text app face-rec (format nil "location ~S" (gficl:mouse-pos))
 		    :ypos 250 :xpos 30 :scale .5))
       (:char
        (when vertex-data
 	 (gficl:draw-vertex-data vertex-data))))))
 
+(defvar $face-rec nil)
+
 (defmethod gficl-app:draw-fn ((app ft01-app))
-  (draw-some-text app))
+  (when $face-rec
+    (draw-some-text app $face-rec)))
 
 #||
 (setq $app (make-instance 'ft01-app))
 (gficl-app:launch $app)
+
+(setq $face-rec (find-create-face $fm "/home/madhu/cl/extern/Github/gficl/examples/assets/Roboto-Regular.ttf" 48))
 (setq *drawing-mode* :char)
 (setq *drawing-mode* :text)
 (gficl-app:in-thread-sync $app
-  (render-char $app #\h :xpos  0 :ypos  0))
+  (ft2-app-render-char $app $face-rec #\h :xpos  0 :ypos  0))
+
+(setq $face-rec (find-create-face $fm "/usr/local/share/fonts/local/IBMPlex/IBM-Plex-Sans-Hebrew/IBMPlexSansHebrew-Text.otf" 64))
+
+(gficl-app:in-thread-sync $app
+  (ft2-app-render-char $app $face-rec #\א :xpos  0 :ypos  0))
+
+(setq $face-rec (find-create-face $fm "/home/madhu/.fonts/shobhika/Shobhika-Regular.otf" 64))
+(gficl-app:in-thread-sync $app
+  (ft2-app-render-char $app $face-rec #\ख :xpos  0 :ypos  0))
 ||#
