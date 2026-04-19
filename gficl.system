@@ -175,7 +175,10 @@
   :source-pathname *gficl-source-dir*
   :binary-pathname *gficl-binary-dir*
   :source-extension "lisp"
-  :depends-on ("claw-cxx-ft.bindings" "gficl-bt")
+  :depends-on ("gficl-bt"
+	        "cffi-object.ops"
+		"claw-cxx-ft.bindings"
+		"claw-cxx-fc.bindings")
   :components ((:module "src/load"
 		:components ((:file "freetype2")))))
 
