@@ -147,14 +147,25 @@
   "Create a 4x4 translation MATRIX. Takes either a VEC or a list of numbers"
   `(create-translation-matrix (make-vec-if-list ,vec)))
 
-(declaim (ftype (function (number) matrix) 2d-rotation-matrix))
-(defun 2d-rotation-matrix (angle)
+(declaim (ftype (function (number &optional keyword) matrix) 2d-rotation-matrix))
+(defun 2d-rotation-matrix (angle &optional (axis :z))
   "returns a 4x4 rotation MATRIX."
-  (make-matrix-from-data
-   `((,(cos angle) ,(- (sin angle)) 0 0)
-     (,(sin angle) ,(cos angle) 0 0)
-     (0 0 1 0)
-     (0 0 0 1))))
+  (ecase axis
+    (:z (make-matrix-from-data
+	 `((,(cos angle) ,(- (sin angle)) 0 0)
+	   (,(sin angle) ,(cos angle) 0 0)
+	   (0 0 1 0)
+	   (0 0 0 1))))
+    (:x (make-matrix-from-data
+	 `((1 0 0 0)
+	   (0 ,(cos angle) ,(- (sin angle)) 0)
+	   (0 ,(sin angle) ,(cos angle) 0)
+	   (0 0 0 1))))
+    (:y (make-matrix-from-data
+	 `((,(cos angle) 0 ,(- (sin angle)) 0)
+	   (0 1 0 0)
+	   (,(- (sin angle)) 0 ,(cos angle) 0)
+	   (0 0 0 1))))))
 
 (declaim (ftype (function (vec
 			   &key (:depth number) (:rotation number) (:pivot vec)))
