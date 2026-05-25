@@ -167,6 +167,21 @@
 	   (,(- (sin angle)) 0 ,(cos angle) 0)
 	   (0 0 0 1))))))
 
+(declaim (ftype (function (number vec) matrix) 3d-rotation-matrix))
+(defun 3d-rotation-matrix (angle-radians axis-vec3) ;glm-rotate
+  (destructuring-bind (x y z) (vec-data axis-vec3)
+    (let* ((norm (sqrt (+ (* x x) (* y y) (* z z))))
+	   (c (cos angle-radians))
+	   (s (sin angle-radians))
+	   (x (/ x norm))
+	   (y (/ y norm))
+	   (z (/ z norm)))
+      (make-matrix-from-data
+       (list (list (+ (* x x (- 1 c)) c)  (- (* x y (- 1 c)) (* z s)) (+ (* x z (- 1 c)) (* y s)) 0)
+	     (list (+ (* y x (- 1 c)) (* z s)) (+ (* y y (- 1 c)) c) (- (* y z (- 1 c)) (* x s)) 0)
+	     (list (- (* x z (- 1 c)) (* y s)) (+ (* y z (- 1 c)) (* x s)) (+ (* z z (- 1 c)) c) 0)
+	     (list 0 0 0 1))))))
+
 (declaim (ftype (function (vec
 			   &key (:depth number) (:rotation number) (:pivot vec)))
 		2d-rect-matrix))
