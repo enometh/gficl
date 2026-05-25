@@ -46,8 +46,8 @@
    :title "TheBookOfShaders APP"
    :vert "
 #if __VERSION__ >= 130
-   #define attribute out
-   #define varying in
+   #define attribute in
+   #define varying out
 #endif
 
 #ifdef GL_ES
@@ -71,6 +71,7 @@ precision mediump float;
 
 #if __VERSION__ >= 130
    out vec4 mgl_FragColor;
+   #define varying in
  #else
    #define mgl_FragColor gl_FragColor
 #endif
@@ -78,7 +79,7 @@ precision mediump float;
 varying vec2 v_texcoord;
 
 void main(){
-    gl_FragColor = vec4(0.0);
+    mgl_FragColor = vec4(0.0);
 }
 "))
 
