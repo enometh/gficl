@@ -60,7 +60,7 @@ FragColor = u_color;
    (mode :initform :triangles)
    (vertices :initform nil))
   (:default-initargs
-   :context-version-major 4     ;; core profile ensured through default-initargs
+   :context-version-major 4
    :context-version-minor 3
    :disable-draw-fn t
    :opengl-profile :opengl-core-profile))
