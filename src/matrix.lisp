@@ -282,6 +282,52 @@ fov is in radians."
 	 (top (* near angle)))
     (perspective-matrix top (- top) (- right) right near far)))
 
+
+(declaim (ftype (function (number number number number number &optional (or null number)) matrix)
+		perspective-matrix2))
+(defun perspective-matrix2 (top bottom left right near &optional far)
+  "create a 4x4 perspective projection MATRIX, far plane at infinity if not given."
+  (make-matrix-from-data
+   `((,(/ (* 2 near) (- right left)) 0 ,(- (/ (+ left right) (- right left))) 0)
+     (0 ,(/ (* 2 near) (- top bottom)) ,(- (/ (+ top bottom) (- top bottom))) 0)
+     ,(if far
+	  `(0 0 ,(+ (/ (+ near far) (- near far))) ,(/ (* 2 near far) (- near far)))
+	`(0 0 1 ,(- (* 2 near))))
+     (0 0 ,(- 1) 0))))
+
+(declaim (ftype (function (number number number number &optional (or null number)) matrix)
+		screen-perspective-matrix2))
+(defun screen-perspective-matrix2 (width height fov near &optional far)
+  "Alternative screen-perspective-matrix
+create a 4x4 perspective projection MATRIX, far plane at infinity if not given.
+fov is in radians.
+This differs from screen-perspective-matrix in that
+The signs of some elements are reversed because we looking down the -z axis.
+"
+  (let* ((ratio (/ width height))
+	 (angle (tan (/ fov 2.0)))
+	 (right (* near ratio angle))
+	 (top (* near angle)))
+    (perspective-matrix2 top (- top) (- right) right near far)))
+
+#||
+;; looking down the z axis
+(screen-perspective-matrix 500 500 (/ pi 4) .1 10)
+;; => #<MATRIX 4x4
+;; (-5.027339492125848D0 0 0.0D0 0)
+;; (0 5.027339492125848D0 -0.0D0 0)
+;; (0 0 1.020202 -0.20202021)
+;; (0 0 1 0)>
+
+;; looking down the -z axis
+(screen-perspective-matrix2 500 500 (/ pi 4) .1 10)
+;; => #<MATRIX 4x4
+;; (5.027339492125848D0 0 -0.0D0 0)
+;; (0 5.027339492125848D0 -0.0D0 0)
+;; (0 0 -1.020202 -0.20202021)
+;; (0 0 -1 0)>
+||#
+
 (defun target-resolution-matrix (current-width current-height final-width final-height)
   "create a 4x4 MATRIX for transforming from one resolution to another."
     (let ((ratio (/ (* current-width final-height) (* current-height final-width))))

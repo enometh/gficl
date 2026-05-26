@@ -139,5 +139,6 @@
    #:screen-orthographic-matrix
    #:perspective-matrix
    #:screen-perspective-matrix
+   #:screen-perspective-matrix2
    #:target-resolution-matrix
    #:2d-rect-matrix))
