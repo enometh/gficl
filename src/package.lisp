@@ -135,6 +135,7 @@
    #:2d-rect-matrix
    #:change-of-basis-matrix
    #:view-matrix
+   #:view-matrix2
    #:orthographic-matrix
    #:screen-orthographic-matrix
    #:perspective-matrix

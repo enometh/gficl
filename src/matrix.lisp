@@ -236,6 +236,31 @@ returns as values the view matrix, the left vector, and the up vector."
 		       (make-vec-if-list ,forward)
 		       (make-vec-if-list ,world-up)))
 
+(defun view-matrix2 (position target world-up) ;(eye,target,up)
+  "create a 4x4 view MATRIX derived from an eye POSITION, a reference
+point TARGET and an UP vector.
+
+\(from the gluLookAt manpage): The matrix maps the TARGET reference
+point to the negative z axis and the eye POSITION to the origin. When
+a typical projection matrix is used, the center of the scene therefore
+maps to the center of the viewport. Similarly, the direction described
+by the UP vector projected onto the viewing plane is mapped to the
+positive y axis so that it points upward in the viewport. The UP
+vector must not be parallel to the line of sight from the eye point to
+the reference point."
+
+ (flet ((make-vec-if-list (list) (if (listp list) (make-vec list) list)))
+  (let ((position-vec (make-vec-if-list position))
+	(target-vec (make-vec-if-list target))
+	(world-up-vec (make-vec-if-list world-up)))
+    (assert-min-dim 3 position-vec target-vec world-up-vec)
+    (let* ((forward (normalise (-vec target-vec position-vec))) ;f
+	   (left (normalise (cross forward (normalise world-up-vec)))) ;s
+	   (up (cross left forward)))	;u
+      (values
+       (*mat (change-of-basis-matrix left up (-vec forward)) (translation-matrix (-vec  position-vec)))
+       up left)))))
+
 ;;; --- perspective matrices ---
 
 (declaim (ftype (function (number number number number number number) matrix) orthographic-matrix))
