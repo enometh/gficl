@@ -249,6 +249,7 @@ positive y axis so that it points upward in the viewport. The UP
 vector must not be parallel to the line of sight from the eye point to
 the reference point."
 
+ (flet ((make-vec-if-list (list) (if (listp list) (make-vec list) list)))
   (let ((position-vec (make-vec-if-list position))
 	(target-vec (make-vec-if-list target))
 	(world-up-vec (make-vec-if-list world-up)))
@@ -258,7 +259,7 @@ the reference point."
 	   (up (cross left forward)))	;u
       (values
        (*mat (change-of-basis-matrix left up (-vec forward)) (translation-matrix (-vec  position-vec)))
-       up left))))
+       up left)))))
 
 ;;; --- perspective matrices ---
 
