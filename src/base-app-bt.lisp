@@ -236,5 +236,11 @@ void main() { gl_FragColor = vec4(0, .7, .7, 1); }")
 	      do (terpri stream))))))
 (in-package "GFICL")
 
-#+nil
-(skeleton 'foo "/dev/shm/1.l")
+#||
+(defpackage "GFICL-EXAMPLE-APP/WIKI-MODERN-GRAPH1" (:use "CL"))
+(export 'GFICL-EXAMPLE-APP/WIKI-MODERN-GRAPH1::wiki-modern-graph1
+	"GFICL-EXAMPLE-APP/WIKI-MODERN-GRAPH1")
+(let ((*package* (find-package  "GFICL-EXAMPLE-APP/WIKI-MODERN-GRAPH1")))
+  (gficl-app:skeleton 'GFICL-EXAMPLE-APP/WIKI-MODERN-GRAPH1::wiki-modern-graph1 "/dev/shm/1.l"))
+(trivial-formatter:fmt-one-file "/dev/shm/1.l" "/dev/shm/2.l")
+||#
