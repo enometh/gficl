@@ -50,8 +50,7 @@ uniform sampler2D screenTexture;
 
 void main()
 {
-    vec3 col = texture(screenTexture, TexCoords).rgb;
-    FragColor = vec4(col, 1.0);
+    FragColor = texture(screenTexture, TexCoords);
 }
 ")
    (screen-shader :initform nil)
@@ -182,6 +181,7 @@ void main()
 	    (gficl:bind-gl test-texture)
 	    (gl:bind-texture :texture-2d
 			     (gficl:framebuffer-texture-id screen-fbo 0)))
+	(gl:active-texture :texture0)
 	(gficl:draw-vertex-data screen-vertex-data)))))
 
 (defmethod gficl-app:cleanup-fn :after ((app gficl-app:fbo-mixin))
