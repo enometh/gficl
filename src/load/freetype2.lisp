@@ -297,10 +297,9 @@ uniform sampler2D tex;
 uniform vec4 color;
 
 void main(void) {
-  gl_FragColor =    vec4(1, 1, 1, texture2D(tex, texcoord).r) * color;
+  gl_FragColor =    vec4(1, 1, 1, texture2D(tex, texcoord).r);// * color;
   //  texture2D(tex, texcoord) * color;;
 }")
-   (tex :initform nil)
    (vertex-data :initform nil)
    (shader :initform nil)
    (fmap :initform (make-hash-table :test #'equal))
@@ -349,7 +348,8 @@ void main(void) {
 
 (defun ft2-app-setup (app)
   (check-type app gficl-app:ft2-mixin-app)
-  (gl:clear-color 0.5 0.7 0.8 0)
+  ;;(gl:clear :color-buffer-bit)
+  ;;(gl:clear-color 0.5 0.7 0.8 0)
   ;;(gl:clear-color 1 1 1 0)
   ;;Enable blending, necessary for our alpha texture
   (gl:enable :blend)
@@ -379,6 +379,7 @@ void main(void) {
     (gficl:bind-gl shader)
     (gficl:bind-matrix shader "projection"
 		       (gficl:screen-orthographic-matrix w h))
+    #+nil
     (gficl:bind-vec shader "color"
 		    (gficl:make-vec '(1 1 1 1)))))
 
@@ -463,17 +464,13 @@ void main(void) {
 ;;; Example
 
 (defclass ft01-app (gficl-app:ft2-mixin-app gficl-app:base-app-bt)
-  ((tex :initform nil))
+  ()
   (:default-initargs
    :opengl-debug-context t
    :title "font rendering"))
 
 (defmethod gficl-app:cleanup-fn ((app ft01-app))
-  (ft2-app-cleanup app)
-  (with-slots (tex) app
-    (when tex
-      (gficl:delete-gl tex)
-      (setq tex nil))))
+  (ft2-app-cleanup app))
 
 (defmethod gficl-app:setup-fn ((app ft01-app))
   (ft2-app-setup app)
