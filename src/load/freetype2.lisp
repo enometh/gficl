@@ -299,9 +299,7 @@ uniform vec4 color;
 
 void main(void) {
   gl_FragColor =    vec4(1, 1, 1, texture2D(tex, texcoord).r) * color;
-  //  texture2D(tex, texcoord) * color;;
 }")
-   (tex :initform nil)
    (vertex-data :initform nil)
    (shader :initform nil)
    (fmap :initform (make-hash-table :test #'equal))
@@ -350,7 +348,8 @@ void main(void) {
 
 (defun ft2-app-setup (app)
   (check-type app gficl-app:ft2-mixin-app)
-  (gl:clear-color 0.5 0.7 0.8 0)
+  ;;(gl:clear :color-buffer-bit)
+  ;;(gl:clear-color 0.5 0.7 0.8 0)
   ;;(gl:clear-color 1 1 1 0)
   ;;Enable blending, necessary for our alpha texture
   (gl:enable :blend)
@@ -374,14 +373,24 @@ void main(void) {
 	(gl:active-texture :texture0)
 	(gl:uniformi loc 0)))))
 
-(defun ft2-app-init (app w h)
-  (check-type app gficl-app:ft2-mixin-app)
+
+(defun ft2-app-set-text-color (app r g b a)
+  (with-slots (shader) app
+    (let ((orig-prog (gl:get-integer :current-program)))
+      (gficl:bind-gl shader)
+      (gficl:bind-vec shader "color" (gficl:make-vec (list r g b a)))
+      (gl:use-program orig-prog))))
+
+(defun ft2-app-reinit (app w h)
   (with-slots (shader) app
     (gficl:bind-gl shader)
     (gficl:bind-matrix shader "projection"
-		       (gficl:screen-orthographic-matrix w h))
-    (gficl:bind-vec shader "color"
-		    (gficl:make-vec '(1 1 1 1)))))
+		       (gficl:screen-orthographic-matrix w h))))
+
+(defun ft2-app-init (app w h)
+  (check-type app gficl-app:ft2-mixin-app)
+  (ft2-app-reinit app w h)
+  (ft2-app-set-text-color app 1 1 1 1))
 
 (defun ft2-app-render-char (app face-rec char &key (xpos 0) (ypos 0) (scale 1))
   (check-type app gficl-app:ft2-mixin-app)
@@ -464,28 +473,21 @@ void main(void) {
 ;;; Example
 
 (defclass ft01-app (gficl-app:ft2-mixin-app gficl-app:base-app-bt)
-  ((tex :initform nil))
+  ()
   (:default-initargs
    :opengl-debug-context t
    :title "font rendering"))
 
 (defmethod gficl-app:cleanup-fn ((app ft01-app))
-  (ft2-app-cleanup app)
-  (with-slots (tex) app
-    (when tex
-      (gficl:delete-gl tex)
-      (setq tex nil))))
+  (ft2-app-cleanup app))
 
 (defmethod gficl-app:setup-fn ((app ft01-app))
   (ft2-app-setup app)
-  (gficl-app:resize-fn app
-		       (gficl:window-width) (gficl:window-height)))
+  (ft2-app-init app (gficl:window-width) (gficl:window-height)))
 
 (defmethod gficl-app:resize-fn ((app ft01-app) w h)
-  (with-slots (shader) app
-    (gficl:bind-gl shader)
-    (ft2-app-init app w h)
-    (gl:viewport 0 0 w h)))
+  (ft2-app-reinit app w h)
+  (gl:viewport 0 0 w h))
 
 (defmethod gficl-app:update-fn ((app ft01-app))
   (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
@@ -521,6 +523,9 @@ void main(void) {
 (setq *drawing-mode* :text)
 (gficl-app:in-thread-sync $app
   (ft2-app-render-char $app $face-rec #\h :xpos  0 :ypos  0))
+
+(gficl-app:in-thread $app
+  (gficl/load/ft2:ft2-app-set-text-color $app .380 .695 .086 1))
 
 (setq $face-rec (find-create-face $fm "/usr/local/share/fonts/local/IBMPlex/IBM-Plex-Sans-Hebrew/IBMPlexSansHebrew-Text.otf" 64))
 
