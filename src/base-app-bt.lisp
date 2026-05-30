@@ -162,10 +162,9 @@ push these into a running instance of APP."
 (defpackage "GFICL-SKELETON" (:use "CL"))
 (in-package "GFICL-SKELETON")
 
-(defun gficl-app:skeleton (class-name file)
+(defun gficl-app:skeleton (class-name file &key (pkg (concatenate 'string "GFICL-EXAMPLE-APP/" (string class-name))))
   "dump skeleton code for CLASS-NAME in FILE"
-  (let* ((pkg (concatenate 'string "GFICL-EXAMPLE-APP/" (string class-name)))
-	 (lname (string-downcase (string class-name)))
+  (let* ((lname (string-downcase (string class-name)))
 	 (forms
 	  `(progn
 	     ";;; -*- Mode: LISP; Package: :cl-user; BASE: 10; Syntax: ANSI-Common-Lisp; -*-"
