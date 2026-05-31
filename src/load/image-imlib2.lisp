@@ -75,7 +75,7 @@ after: bottom-left = (0 0), top-right = (1 1)."
 (defun image-imlib2 (path &rest texture-key-args)
   (cffi:with-foreign-object (err :int)
     (let ((image (imlib:load-image-with-errno-return
-		  path err)))
+		  (namestring path) err)))
       (unless (zerop (cffi:mem-ref err :int))
 	(error "Imlib2: failed to load image: load-error: ~A"
 	       (imlib:strerror (cffi:mem-ref err :int))))
