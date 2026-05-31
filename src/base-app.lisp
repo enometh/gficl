@@ -50,6 +50,7 @@
    "PROCESS-PENDING-EVENTS-STYLE"
    "DISABLE-DRAW-FN"
    "*APPS*"
+   "RESET-SLOTS"
    ))
 
 (in-package "GFICL")
@@ -238,3 +239,14 @@
 
 #+nil
 (%cl-glfw3:terminate)
+
+(defmacro gficl-app:reset-slots (app-var &rest slots)
+  "Convenience macro. for use in gficl:cleanup-fn methods to cleanup
+slot objects which are allocate in gficl-app:setup-fn, which are
+cleaned up by calling gficl:delete-gl. The corresponding initform in
+the class definition is assumed to be nil."
+  `(with-slots (,@slots) ,app-var
+     ,@(loop for slot in slots
+	     collect `(when ,slot
+			(gficl:delete-gl ,slot)
+			(setq ,slot nil)))))
