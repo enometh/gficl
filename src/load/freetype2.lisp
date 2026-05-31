@@ -8,7 +8,13 @@
 ;;;
 (defpackage "GFICL/LOAD/FT2"
   (:shadow "VECTOR")
-  (:use "CL"))
+  (:use "CL")
+  (:export
+   "FT2-APP-SETUP" "FT2-APP-CLEANUP" "FT2-APP-INIT" "FT2-APP-RENDER-CHAR"
+   "FT2-APP-RENDER-TEXT"
+   "FONT-MAN" "INIT-FONT-MAN" "$FM" "CLOSE-FONT-MAN"
+   "FIND-CREATE-FACE"
+))
 (in-package "GFICL/LOAD/FT2")
 
 #||
