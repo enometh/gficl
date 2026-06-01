@@ -73,6 +73,47 @@
 (cffi:defcfun ("imlib_free_image" claw-cxx-imlib2::free-image)
     :void)
 
+(cffi:defcfun ("imlib_create_image" claw-cxx-imlib2::create-image)
+    claw-cxx-imlib2::image
+  (claw-cxx-imlib2::width :int)
+  (claw-cxx-imlib2::height :int))
+
+(cffi:defcfun ("imlib_create_image_using_copied_data"
+               claw-cxx-imlib2::create-image-using-copied-data)
+    claw-cxx-imlib2::image
+  (claw-cxx-imlib2::width :int)
+  (claw-cxx-imlib2::height :int)
+  (claw-cxx-imlib2::data (:pointer claw-cxx-imlib2::uint32-t)))
+
+(cffi:defcfun ("imlib_create_image_using_data"
+               claw-cxx-imlib2::create-image-using-data)
+    claw-cxx-imlib2::image
+  (claw-cxx-imlib2::width :int)
+  (claw-cxx-imlib2::height :int)
+  (claw-cxx-imlib2::data (:pointer claw-cxx-imlib2::uint32-t)))
+
+(cffi:defcfun ("imlib_save_image" claw-cxx-imlib2::save-image)
+    :void
+  (claw-cxx-imlib2::file :string))
+
+(cffi:defcfun ("imlib_save_image_with_errno_return"
+               claw-cxx-imlib2::save-image-with-errno-return)
+    :void
+  (claw-cxx-imlib2::file :string)
+  (claw-cxx-imlib2::error-return (:pointer :int)))
+
+(cffi:defcfun ("imlib_save_image_with_error_return"
+               claw-cxx-imlib2::save-image-with-error-return)
+    :void
+  (claw-cxx-imlib2::file :string)
+  (claw-cxx-imlib2::error-return (:pointer claw-cxx-imlib2::load-error)))
+
+
+(cffi:defcfun ("imlib_image_set_format" claw-cxx-imlib2::image-set-format)
+    :void
+  (claw-cxx-imlib2::format :string))
+
+
 
 ;;; ----------------------------------------------------------------------
 ;;;
@@ -91,7 +132,13 @@
   (export 'claw-cxx-imlib2::image-get-data "CLAW-CXX-IMLIB2")
   (export 'claw-cxx-imlib2::context-get "CLAW-CXX-IMLIB2")
   (export 'claw-cxx-imlib2::context-free "CLAW-CXX-IMLIB2")
-  (export 'claw-cxx-imlib2::free-image "CLAW-CXX-IMLIB2"))
+  (export 'claw-cxx-imlib2::free-image "CLAW-CXX-IMLIB2")
+  (export 'claw-cxx-imlib2::create-image "CLAW-CXX-IMLIB2")
+  (export 'claw-cxx-imlib2::create-image-using-copied-data "CLAW-CXX-IMLIB2")
+  (export 'claw-cxx-imlib2::create-image-using-data "CLAW-CXX-IMLIB2")
+  (export 'claw-cxx-imlib2::save-image "CLAW-CXX-IMLIB2")
+  (export 'claw-cxx-imlib2::save-image-with-errno-return "CLAW-CXX-IMLIB2")
+  (export 'claw-cxx-imlib2::image-set-format "CLAW-CXX-IMLIB2"))
 
 
 ;;; ----------------------------------------------------------------------

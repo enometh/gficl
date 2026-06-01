@@ -7,7 +7,8 @@
 ;;;   Copyright (C) 2025 Madhu.  All Rights Reserved.
 ;;;
 (defpackage "GFICL/LOAD/IMAGE-IMLIB2"
-  (:export "IMAGE-IMLIB2")
+  (:export "IMAGE-IMLIB2"
+   "SAVE-TEXTURE-TO-FILE" "SCREENSHOT")
   (:use "CL"))
 (in-package "GFICL/LOAD/IMAGE-IMLIB2")
 
@@ -98,3 +99,48 @@ after: bottom-left = (0 0), top-right = (1 1)."
 		     w h))
 	(imlib:context-free (imlib:context-get))
 	(imlib:free-image)))))
+
+(defun save-texture-to-file (texture path &key format id)
+  "If ID (an integer texture ID) is specified, it is used instead
+of TEXTURE.  Otherwise TEXTURE (a gficl:texture object) which is saved
+to PATH. FORMAT if specified (a string) is passed to
+imlib_image_set_format. Otherwise imlib2 derives the format from the
+extension in PATH.
+
+WARNING: If the texture is being used in the pipeline, calling this
+function may mess it up, requiring a restart.
+"
+  (let* ((id (or id (gficl::id texture)))
+	 (h (gl:get-texture-level-parameter id 0 :texture-height))
+	 (w (gl:get-texture-level-parameter id 0 :texture-width))
+	 (nchan 4))
+    (cffi:with-foreign-object (ptr :unsigned-char (* w h nchan))
+      (gl:bind-texture :texture-2d id)
+      (gl:pixel-store :pack-alignment 1)
+      (%gl:get-tex-image :texture-2d 0 :rgba :unsigned-byte ptr)
+      (vertical-flip ptr w h)
+      (loop for i below (* w h)
+	    for elt = (cffi:mem-aref ptr :uint32 i)
+	    do (setf (cffi:mem-aref ptr :uint32 i)
+		     (argb->rgba elt)))
+      (let ((image (imlib:create-image-using-data w h ptr)))
+	(imlib:context-set-image image)
+	(when format
+	  (imlib:image-set-format format))
+	(cffi:with-foreign-object (err :int)
+	  (imlib:save-image-with-errno-return (namestring path) err)
+	  (unless (zerop (cffi:mem-ref err :int))
+	    (error "Imlib2: failed to save image: load-error: ~A"
+		   (imlib:strerror (cffi:mem-ref err :int)))))
+	(imlib:free-image)))))
+
+(defun screenshot (file &key format)
+  "save screenshot of viewport to file.
+See SAVE-TEXTURE-TO-FILE."
+  (let ((dims (gl:get-integer :viewport)))
+    (destructuring-bind (x y w h) (coerce dims 'list)
+      (let ((tex (gficl:make-texture w h :format :rgba)))
+	(gficl:bind-gl tex)
+	(gl:copy-tex-image-2d :texture-2d 0 :rgba x y w h 0)
+	(gl:pixel-store :pack-alignment 1)
+	(save-texture-to-file tex file)))))
