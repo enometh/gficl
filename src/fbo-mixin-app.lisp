@@ -22,6 +22,7 @@
 	    gficl::fbo-screen-setup
 	    gficl::fbo-screen-cleanup
 	    gficl::fbo-screen-maybe-init-fbo
+	    gficl::call-with-fbo-screen-draw
 	    gficl::fbo-screen-draw-pre
 	    gficl::fbo-screen-draw-post)
 	  :gficl))
@@ -185,6 +186,11 @@ void main()
 	    (gl:bind-texture :texture-2d
 			     (gficl:framebuffer-texture-id screen-fbo 0)))
 	(gficl:draw-vertex-data screen-vertex-data)))))
+
+(defun call-with-fbo-screen-draw (app func &key (draw t))
+  (unwind-protect (fbo-screen-draw-pre app)
+    (funcall func app)
+    (fbo-screen-draw-post app :draw draw)))
 
 (defmethod gficl-app:cleanup-fn :after ((app gficl-app:fbo-mixin))
   (fbo-screen-cleanup app))
