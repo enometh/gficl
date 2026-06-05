@@ -541,4 +541,103 @@ void main(void) {
 (setq $face-rec (find-create-face $fm "/home/madhu/.fonts/shobhika/Shobhika-Regular.otf" 64))
 (gficl-app:in-thread-sync $app
   (ft2-app-render-char $app $face-rec #\ख :xpos  0 :ypos  0))
+(gficl-app:replace-and-reload $app 'vs-source 'fs-source)
+||#
+
+
+;;; ----------------------------------------------------------------------
+;;;
+;;;
+;;;
+(defclass ft2-fbo-mixin-app ()
+  ((ft2 :initform nil)
+   (font-path :initform
+	      (mk::system-relative-pathname :gficl #p"examples/assets/Roboto-Regular.ttf")
+	      :initarg :font-path)
+   (font-size :initform 64 :initarg :font-size)
+   (fbo :initform nil)
+   (width :initarg :width :initform 400)
+   (height :initarg :height :initform 200)
+   (fm :initform gficl/load/ft2:$fm)
+   (face-rec :initform nil)))
+
+(defmethod gficl-app:cleanup-fn :after ((app ft2-fbo-mixin-app))
+  (with-slots (ft2 fbo font-path fm font-size) app
+    (when fbo
+      (gficl:fbo-screen-cleanup fbo)
+      (setq fbo nil))
+    (when ft2
+      (gficl/load/ft2:ft2-app-cleanup ft2)
+      (setq ft2 nil))))
+
+(defmethod gficl-app:setup-fn :after ((app ft2-fbo-mixin-app))
+  (with-slots (fbo ft2 face-rec font-path font-size fm width height) app
+    (progn (setq fbo (gficl:fbo-screen-new))
+	   (gficl:fbo-screen-setup fbo)
+	   (gficl:fbo-screen-maybe-init-fbo fbo width height :red))
+    (progn (setq ft2 (make-instance 'gficl-app:ft2-mixin-app))
+	   (gficl/load/ft2:ft2-app-setup ft2)
+	   (gficl/load/ft2:ft2-app-init ft2 width height))
+    (setq face-rec
+	  (gficl/load/ft2:find-create-face fm font-path font-size))))
+
+(defun ft2-fbo-mixin-render-text-to-fbo (app text &rest ft2-app-render-text-args  &key &allow-other-keys)
+  (check-type app ft2-fbo-mixin-app)
+  (with-slots (fbo ft2 face-rec) app
+    (gficl::call-with-fbo-screen-draw
+     fbo
+     (lambda (fbo)
+       (declare (ignore fbo))
+       (when face-rec
+	 (gl:clear :color-buffer)
+	 (gl:clear :color-buffer-bit :depth-buffer-bit)
+	 (apply #'gficl/load/ft2:ft2-app-render-text
+		ft2
+		face-rec
+		text
+		ft2-app-render-text-args))))))
+
+(defun ft2-fbo-mixin-render-fbo (app)
+  (check-type app ft2-fbo-mixin-app)
+  (with-slots (ft2 fbo face-rec) app
+    (gl:clear :color-buffer)
+    (gl:clear :color-buffer-bit :depth-buffer-bit)
+    (with-slots (gficl::screen-shader gficl::screen-fbo
+		 gficl::screen-vertex-data)
+	fbo
+      (gficl:bind-gl gficl::screen-shader)
+      (gl:active-texture :texture0)
+      (gl:bind-texture :texture-2d
+		       (gficl:framebuffer-texture-id gficl::screen-fbo 0))
+      (gficl:draw-vertex-data gficl::screen-vertex-data)
+      ;;(gl:bind-vertex-array 0)
+      ;;(gl:use-program 0)
+      )))
+
+
+#||
+(defclass foo (gficl-app:base-app-bt ft2-fbo-mixin-app) ())
+
+(user::defmethod gficl-app:setup-fn ((app foo))
+  (when (next-method-p) (call-next-method)))
+
+(user::defmethod gficl-app:update-fn ((app foo))
+  (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
+
+(user::defmethod gficl-app:draw-fn ((app foo))
+  (ft2-fbo-mixin-render-fbo app))
+
+(setq $a (make-instance 'foo :disable-draw-fn t :context-version-major 4 :context-version-minor 3 :opengl-profile :opengl-core-profile :opengl-debug-context t))
+(gficl-app:launch $a)
+
+(gficl-app:in-thread $a
+  (ft2-fbo-mixin-render-text-to-fbo $a "OK Boomer" :ypos 100 :xpos 10 :scale .5))
+
+(gficl-app:in-thread $a
+  (gficl/load/image-imlib2:save-texture-to-file
+   (gficl:framebuffer-texture (slot-value (slot-value $a 'fbo) 'gficl::screen-fbo) 0)
+   "/dev/shm/1.jpg"))
+
+(gficl-app:in-thread $a (glfw:swap-buffers))
+(gficl-app:shutdown $a)
 ||#
