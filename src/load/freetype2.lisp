@@ -549,6 +549,14 @@ void main(void) {
 ;;;
 ;;;
 ;;;
+(eval-when (load eval compile)
+  (export '(ft2-fbo-mixin-app
+	    ft2-fbo-mixin-app-setup
+	    ft2-fbo-mixin-app-cleanup
+	    ft2-fbo-mixin-render-text-to-texture)
+	  :gficl/load/ft2))
+
+
 (defclass ft2-fbo-mixin-app ()
   ((ft2 :initform nil)
    (font-path :initform
@@ -556,12 +564,13 @@ void main(void) {
 	      :initarg :font-path)
    (font-size :initform 64 :initarg :font-size)
    (fbo :initform nil)
-   (width :initarg :width :initform 400)
+   (width :initarg :width :initform 400) ; not gficl::width and gficl::height
    (height :initarg :height :initform 200)
    (fm :initform gficl/load/ft2:$fm)
    (face-rec :initform nil)))
 
-(defmethod gficl-app:cleanup-fn :after ((app ft2-fbo-mixin-app))
+(defun ft2-fbo-mixin-app-cleanup (app)
+  (check-type app ft2-fbo-mixin-app)
   (with-slots (ft2 fbo font-path fm font-size) app
     (when fbo
       (gficl:fbo-screen-cleanup fbo)
@@ -570,16 +579,26 @@ void main(void) {
       (gficl/load/ft2:ft2-app-cleanup ft2)
       (setq ft2 nil))))
 
-(defmethod gficl-app:setup-fn :after ((app ft2-fbo-mixin-app))
+(defun ft2-fbo-mixin-app-setup (app)
+  (check-type app ft2-fbo-mixin-app)
   (with-slots (fbo ft2 face-rec font-path font-size fm width height) app
     (progn (setq fbo (gficl:fbo-screen-new))
 	   (gficl:fbo-screen-setup fbo)
-	   (gficl:fbo-screen-maybe-init-fbo fbo width height :red))
+	   (gficl:fbo-screen-maybe-init-fbo fbo width height #+nil :red :rgba))
     (progn (setq ft2 (make-instance 'gficl-app:ft2-mixin-app))
 	   (gficl/load/ft2:ft2-app-setup ft2)
 	   (gficl/load/ft2:ft2-app-init ft2 width height))
     (setq face-rec
 	  (gficl/load/ft2:find-create-face fm font-path font-size))))
+
+(defun ft2-fbo-mixin-maybe-reinit (app w h &key force)
+  (check-type app ft2-fbo-mixin-app)
+  (with-slots (fbo ft2 face-rec fm width height) app
+    (when (or force
+	      (not (and (= w width) (= h height))))
+      (setq width w height h)
+      (gficl:fbo-screen-maybe-init-fbo fbo width height :rgba force)
+      (ft2-app-reinit ft2 width height))))
 
 (defun ft2-fbo-mixin-render-text-to-fbo (app text &rest ft2-app-render-text-args  &key &allow-other-keys)
   (check-type app ft2-fbo-mixin-app)
@@ -595,7 +614,29 @@ void main(void) {
 		ft2
 		face-rec
 		text
-		ft2-app-render-text-args))))))
+		ft2-app-render-text-args)))
+     :draw nil)))
+
+(defun ft2-fbo-mixin-get-text-extent (app text &key (scale 1.0))
+  (check-type app ft2-fbo-mixin-app)
+  (with-slots (fbo ft2 face-rec fm) app
+    (with-slots (fmap) ft2
+      (text-extent face-rec text fmap scale))))
+
+(defun ft2-fbo-mixin-render-text-to-texture (app text &key (scale 1))
+  "Renders given line of TEXT to a temporary texture, which is resized
+to fit the text. Returns the texture ID."
+  (multiple-value-bind (w h)
+      (ft2-fbo-mixin-get-text-extent app text :scale scale)
+    (setq w (truncate w) h (truncate h))
+    (with-slots (face-rec fbo) app
+      (with-slots (size) face-rec
+	(assert (<= h size))
+	(ft2-fbo-mixin-maybe-reinit app w size :force t)
+	(ft2-fbo-mixin-render-text-to-fbo app text :ypos (- size (/ (- size h) 2))
+					  :xpos 0 :scale scale))
+      (with-slots (gficl::screen-shader gficl::screen-fbo) fbo
+	(gficl:framebuffer-texture-id gficl::screen-fbo 0)))))
 
 (defun ft2-fbo-mixin-render-fbo (app)
   (check-type app ft2-fbo-mixin-app)
@@ -615,6 +656,12 @@ void main(void) {
       )))
 
 
+(defmethod gficl-app:cleanup-fn :after ((app ft2-fbo-mixin-app))
+  (ft2-fbo-mixin-app-cleanup app))
+
+(defmethod gficl-app:setup-fn :after ((app ft2-fbo-mixin-app))
+  (ft2-fbo-mixin-app-setup app))
+
 #||
 (defclass foo (gficl-app:base-app-bt ft2-fbo-mixin-app) ())
 
@@ -629,14 +676,21 @@ void main(void) {
 
 (setq $a (make-instance 'foo :disable-draw-fn t :context-version-major 4 :context-version-minor 3 :opengl-profile :opengl-core-profile :opengl-debug-context t))
 (gficl-app:launch $a)
+(setf (gficl-app:disable-draw-fn $a) nil)
 
 (gficl-app:in-thread $a
-  (ft2-fbo-mixin-render-text-to-fbo $a "OK Boomer" :ypos 100 :xpos 10 :scale .5))
+  (ft2-fbo-mixin-maybe-reinit $a 500 300)
+  (ft2-fbo-mixin-render-text-to-fbo $a "OK Boomer1" :ypos 100 :xpos 10 :scale .5))
 
 (gficl-app:in-thread $a
   (gficl/load/image-imlib2:save-texture-to-file
    (gficl:framebuffer-texture (slot-value (slot-value $a 'fbo) 'gficl::screen-fbo) 0)
    "/dev/shm/1.jpg"))
+
+(gficl-app:in-thread $a
+  (with-slots (ft2) $a
+    (gficl/load/ft2:ft2-app-set-text-color ft2 .380 .895 .086 1))
+  (ft2-fbo-mixin-render-text-to-texture $a "και ο δευτερος" :scale 0.8))
 
 (gficl-app:in-thread $a (glfw:swap-buffers))
 (gficl-app:shutdown $a)
