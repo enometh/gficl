@@ -69,6 +69,18 @@ some (or none) of :{alt,shift,control,super}"
   "returns zero or one of :scroll-{up,down,right,left}"
   (slot-value (render-input *state*) 'scroll-state))
 
+;; Retrieve all Keys and Buttons
+
+(defun keys-released ()
+  (loop for key being each hash-key of (slot-value (render-prev-input *state*) 'key-state)
+	if (not (key-present (render-input *state*) key))
+	collect key))
+
+(defun buttons-released ()
+  (loop for button being each hash-key of (slot-value (render-prev-input *state*) 'mouse-state)
+	if (not (button-present (render-input *state*) button))
+	collect button))
+
 ;; --- helpers ---
 
 (defun key-present (state key)

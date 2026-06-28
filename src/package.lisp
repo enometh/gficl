@@ -26,6 +26,8 @@
    ;; modifiers & scroll
    #:modifiers
    #:scroll-state
+   ;; all keys and buttons
+   #:keys-released #:buttons-released
 
    ;;hardware querying
    #:msaa-samples
