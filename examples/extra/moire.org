@@ -1,0 +1,191 @@
+#+title: moire.org - shader from mutter's MetaBackgroundContent
+#+author: enometh@net.meer
+* run shaders from mutter's meta-background-content on the tbs-shadertoy app.
+#+PROPERTY: header-args :results silent
+
+#+begin_src elisp
+;; load the elisp and org-babel interfaces to gficl-app so we can
+;; evaluate forms in the org file
+(load "replace-frag.el")
+#+end_src
+
+#+begin_src lisp
+;; create the tbs-shadertoy app with a core opengl context
+;; and override the shaders
+(in-package :gficl-examples/shadertoy)
+(setq $t1 (make-instance 'tbs-shadertoy-app
+	    :opengl-debug-context 1
+	    :opengl-profile :opengl-core-profile
+	    :context-version-major 4
+	    :context-version-minor 6
+	    :opengl-version-major 4
+	    :opengl-version-minor 6
+	    :vert "#version 150 core
+in vec2 a_position;
+in vec2 a_texcoord;
+out vec2 v_texcoord;
+void main() { gl_Position = vec4(a_position, 0.0, 1.0); v_texcoord = a_texcoord; }
+"
+	    :frag "#version 150 core
+in vec2 v_texcoord;
+out vec4 color;
+void main() { color = vec4(0,0.8,0.8,1); }
+"))
+,#+nil
+(glfw:init-hint :platform :wayland)
+,#+nil
+(gficl-app:launch $t1)
+#+end_src
+
+#+begin_src elisp
+;; inspect the element in emacs
+(sly-eval-for-inspector
+ `(slynk:init-inspector "gficl-examples/shadertoy::$t1"))
+
+;; allow org-babel execution without confirmation
+(setq org-confirm-babel-evaluate (lambda (lang body) (if (member lang '("sclang" "glsl")) nil)))
+#+end_src
+
+** e.g. color fragment shader 0
+#+begin_src glsl :results silent
+#version 460 core
+#ifdef GL_ES
+precision mediump float;
+#endif
+#if __VERSION__ >= 130
+   out vec4 mgl_FragColor;
+   #define varying in
+ #else
+   #define mgl_FragColor gl_FragColor
+#endif
+uniform vec2 u_resolution;
+uniform vec2 u_mouse;
+uniform float u_time;
+void main() {
+	vec2 st = gl_FragCoord.xy/u_resolution *.9;
+	mgl_FragColor = vec4(st.x,st.y,0.0,1.0);
+}
+#+end_src
+** pipeline:  meta_background_content
+#+begin_src glsl
+#version 330
+
+uniform vec2 u_resolution;
+in vec2 v_texcoord;
+out vec4 color;
+
+// #define GRADIENT_VERTEX_SHADER_DECLARATIONS                             \
+// "uniform vec2 scale;\n"                                                 \
+// "varying vec2 position;\n"                                              \
+// #define GRADIENT_VERTEX_SHADER_CODE                                     \
+// "position = cogl_tex_coord0_in.xy * scale;\n"                           \
+// #define GRADIENT_FRAGMENT_SHADER_DECLARATIONS                           \
+// "uniform float gradient_height_perc;\n"                                 \
+// "uniform float gradient_max_darkness;\n"                                \
+// "varying vec2 position;\n"                                              \
+
+float gradient_height_perc = 20.0;
+float gradient_max_darkness = 0.2;
+
+vec3 gradient_shader(vec3 rgb) {
+  vec2 position = v_texcoord;
+  float min_brightness = 1.0 - gradient_max_darkness;
+  float gradient_y_pos = min(position.y, gradient_height_perc) / gradient_height_perc;
+  float pixel_brightness = (1.0 - min_brightness) * gradient_y_pos + min_brightness;
+  return  vec3(rgb * pixel_brightness);
+}
+
+
+// #define VIGNETTE_VERTEX_SHADER_DECLARATIONS                             \
+// "uniform vec2 scale;\n"                                                 \
+// "uniform vec2 offset;\n"                                                \
+// "varying vec2 position;\n"                                              \
+// #define VIGNETTE_VERTEX_SHADER_CODE                                     \
+// "position = cogl_tex_coord0_in.xy * scale + offset;\n"                  \
+// #define VIGNETTE_FRAGMENT_SHADER_DECLARATIONS                           \
+// "uniform float vignette_sharpness;\n"                                   \
+// "varying vec2 position;\n"                                              \
+
+float vignette_sharpness = 0.3;
+vec2 offset = vec2(-.5,-.5);
+
+float rand(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123); }
+
+vec3 vignette_shader(vec3 rgb) {
+  vec2 position = v_texcoord + offset;
+  float t = 1.4142 * length(position);
+  t = min(t, 1.0);
+  float pixel_brightness = 1.0 - t * vignette_sharpness;
+  rgb = rgb * pixel_brightness;
+  rgb +=  (rand(position) - 0.5) / 255.0;
+  return rgb;
+}
+
+// #define ROUNDED_CLIP_FRAGMENT_SHADER_DECLARATIONS
+// uniform vec4 bounds;           // x, y: top left; z, w: bottom right
+// "uniform float clip_radius;
+// "uniform vec2 pixel_step;
+
+vec4 bounds = vec4(0, 0, -5, -.5);           // x, y: top left; z, w: bottom right
+float clip_radius = 0.2;
+
+float
+rounded_rect_coverage (vec2 p)
+{
+  float center_left  = bounds.x + clip_radius;
+  float center_right = bounds.z - clip_radius;
+  float center_x;
+
+  if (p.x < center_left)
+    center_x = center_left;
+  else if (p.x > center_right)
+    center_x = center_right;
+  else
+    return 1.0; // The vast majority of pixels exit early here
+
+  float center_top    = bounds.y + clip_radius;
+  float center_bottom = bounds.w - clip_radius;
+  float center_y;
+
+  if (p.y < center_top)
+    center_y = center_top;
+  else if (p.y > center_bottom)
+    center_y = center_bottom;
+  else
+    return 1.0;
+
+  vec2 delta = p - vec2 (center_x, center_y);
+  float dist_squared = dot (delta, delta);
+
+  // Fully outside the circle
+  float outer_radius = clip_radius + 0.5;
+  if (dist_squared >= (outer_radius * outer_radius))
+    return 0.0;
+
+  // Fully inside the circle
+  float inner_radius = clip_radius - 0.5;
+  if (dist_squared <= (inner_radius * inner_radius))
+    return 1.0;
+
+  // Only pixels on the edge of the curve need expensive antialiasing
+  return outer_radius - sqrt (dist_squared);
+}
+
+vec3 rounded_clip(vec3 rgb) {
+  vec2 texture_coord;
+  //vec2 pixel_step = vec2(1,1)/u_resolution;
+  vec2 pixel_step = vec2(1,1);
+  texture_coord = v_texcoord / pixel_step;
+  rgb *= rounded_rect_coverage (texture_coord);
+  return rgb;
+}
+
+void main()
+{
+  vec3 rgb=vec3(0,.8,.8);
+  rgb =  gradient_shader(rgb);
+  rgb = vignette_shader(rgb);
+//  rgb = rounded_clip(rgb);
+  color = vec4(rgb,1);
+}
+#+end_src
