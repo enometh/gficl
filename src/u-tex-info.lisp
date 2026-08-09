@@ -3,7 +3,8 @@
   (:export "U-TEX-INFO" "U-TEX-NAME" "U-TEX" "U-TEX-LOC"
    "U-TEX-RESOLUTION" "U-TEX-RESOLUTION-NAME"
    "U-TEX-RESOLUTION-LOC"
-   "U-TEX-INFO-CLEAR" "U-TEX-INFO-INIT"))
+   "U-TEX-INFO-CLEAR" "U-TEX-INFO-INIT"
+   "U-TEX-INFO-GL-UNIFORM"))
 (in-package "GFICL-U-TEX-INFO")
 
 
@@ -17,7 +18,8 @@
    (u-tex-resolution :initform #(0.0 0.0))
    (u-tex-resolution-name :initform nil)
    (u-tex-resolution-loc :initform nil)
-   (u-tex-path :initform nil :initarg :path)))
+   (u-tex-path :initform nil :initarg :path)
+   (u-tex-info-modified :initform t)))
 
 #+nil
 (defun make-clear-form (obj class-name)
@@ -65,3 +67,10 @@
 	(setq u-tex tex)
 	(replace u-tex-resolution (list ww hh))
 	(gficl:bind-gl u-tex)))))
+
+(defun u-tex-info-gl-uniform (u)
+  (with-slots (u-tex-loc u-tex-resolution-loc u-tex-resolution u-tex-info-modified) u
+    (when u-tex-info-modified
+      (when (and u-tex-loc (/= u-tex-loc -1) (/= u-tex-resolution-loc -1))
+	(gl:uniformfv u-tex-resolution-loc (subseq u-tex-resolution 0 2)))
+      (setq u-tex-info-modified nil))))

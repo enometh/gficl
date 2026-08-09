@@ -77,6 +77,7 @@ void main()
    (idate :initform #(0 0 0 0))
    (iglobaltime :initform 0.0)
    (iresolution :initform #(0.0 0.0 0.0))
+   (iresolution-changed :initform nil)
    (data :initform nil)
    (shader :initform nil))
   (:default-initargs
@@ -112,8 +113,11 @@ updated."
 	  (setq main-frag frag))))))
 
 (defmethod gficl-app:resize-fn ((app shadertoy-app) w h)
-  (with-slots (iresolution shader) app
+  (with-slots (iresolution shader
+	       iresolution-changed)
+      app
     (replace iresolution (list w h 0.0))
+    (setq iresolution-changed t)
     (gficl:bind-gl shader)
     (gl:viewport 0 0 w h)))
 
@@ -138,6 +142,8 @@ updated."
      app
      (lambda (app vert frag)
        (replace-shader app vert frag)
+       (with-slots (iresolution-changed) app
+	 (setq iresolution-changed t))
        (signal 'gficl-app:restart-pipeline))
      app vert fs-source)))
 
@@ -148,14 +154,18 @@ updated."
   (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
 
 (defmethod gficl-app:draw-fn ((app shadertoy-app))
-  (with-slots (idate iglobaltime iresolution data shader) app
+  (with-slots (idate iglobaltime iresolution data shader
+	       iresolution-changed)
+      app
     (gl:clear :color-buffer)
     (gl:uniformfv (gficl:shader-loc shader "IDATE")
 		  (map 'vector 'float idate))
     (gl:uniformf (gficl:shader-loc shader "IGLOBALTIME")
 		 iglobaltime)
-    (gl:uniformfv (gficl:shader-loc shader "IRESOLUTION")
-		  iresolution)
+    (when iresolution-changed
+      (gl:uniformfv (gficl:shader-loc shader "IRESOLUTION")
+		    iresolution)
+      (setq iresolution-changed nil))
     (gficl:draw-vertex-data data)))
 
 (defun run ()
@@ -167,6 +177,7 @@ updated."
 (gficl-app:shutdown)
 (gficl-app:launch $t)
 (eq $t (elt gficl-app:*apps* 0))
+(setf (slot-value $t 'iresolution-changed) t)
 ||#
 
 ;; redefine frag to a new fragment shader

@@ -39,6 +39,7 @@
    (resolution-loc :initform nil)
    (mouse-loc :initform nil)
    (mouse :initform #(0.0 0.0))
+   (mouse-changed :initform t)
    (u-textures :initform nil :initarg :u-textures)
    (u-tex-infos :initform nil))
 
@@ -147,29 +148,36 @@ void main(){
     (gficl-app:resize-fn app (gficl:window-width) (gficl:window-height))))
 
 (defmethod gficl-app:update-fn ((app tbs-shadertoy-app))
-  (with-slots (iglobaltime mouse) app
+  (with-slots (iglobaltime mouse mouse-changed) app
     (setq iglobaltime (glfw:get-time))
     (destructuring-bind (x y) (gficl:mouse-pos)
-      (setf (elt mouse 0) x)
-      (setf (elt mouse 1) y)))
+      (unless (and (eql x (elt mouse 0))
+		   (eql y (elt mouse 1)))
+	(setf (elt mouse 0) x)
+	(setf (elt mouse 1) y)
+	(setq mouse-changed t))))
   (gficl:map-keys-pressed (:escape (glfw:set-window-should-close))))
 
 (defmethod gficl-app:draw-fn ((app tbs-shadertoy-app))
   (with-slots (data iglobaltime iresolution shader
 	       mouse
 	       time-loc resolution-loc mouse-loc
-	       u-tex-infos)
+	       u-tex-infos
+	       mouse-changed
+	       iresolution-changed)
       app
     (gl:clear :color-buffer)
     (unless (= time-loc -1) (gl:uniformf time-loc iglobaltime))
     (unless (= resolution-loc -1)
-      (gl:uniformfv resolution-loc (subseq iresolution 0 2)))
+      (when iresolution-changed
+	(gl:uniformfv resolution-loc (subseq iresolution 0 2)))
+      (setq iresolution-changed nil))
     (unless (= mouse-loc -1)
-      (gl:uniformfv mouse-loc mouse))
+      (when mouse-changed
+	(gl:uniformfv mouse-loc mouse)
+	(setq mouse-changed nil)))	;
     (loop for u in u-tex-infos
-	  do (with-slots (u-tex-loc u-tex-resolution-loc u-tex-resolution) u
-	       (when (and u-tex-loc (/= u-tex-loc -1) (/= u-tex-resolution-loc -1))
-		 (gl:uniformfv u-tex-resolution-loc (subseq u-tex-resolution 0 2)))))
+	  do (u-tex-info-gl-uniform u))
     (gficl:draw-vertex-data data)))
 
 #||
